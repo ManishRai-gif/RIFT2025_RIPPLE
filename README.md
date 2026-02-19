@@ -1,49 +1,140 @@
-# Autonomous DevOps Agent
+# Ripple DevOps Agent
 
-An autonomous DevOps agent that analyzes failing tests, proposes fixes using LLM (Gemini), and runs tests in Docker. Includes a React dashboard for monitoring.
+An autonomous DevOps agent that analyzes failing tests, proposes fixes using AI (Gemini), and runs tests in isolated Docker containers. Includes a React dashboard for monitoring.
 
-## Architecture
+---
 
-```
-+------------------+     REST      +------------------+
-|  React Dashboard | <-----------> |  Express Backend |
-|  (Vite)          |   /api/*      |  (Node.js)       |
-+------------------+               +------------------+
-                                          |
-                                          v
-                                 +------------------+
-                                 |  Agent Pipeline  |
-                                 +------------------+
-                                          |
-        +----------------+----------------+----------------+
-        |                |                |                |
-        v                v                v                v
-+------------+   +------------+   +------------+   +------------+
-|  Analyzer  |   |  Fix Agent |   |  Test Agent|   |  Git Agent |
-|  (Gemini)  |   |  (Gemini)  |   |  (Docker)  |   |  (simple-  |
-|            |   |            |   |            |   |   git)     |
-+------------+   +------------+   +------------+   +------------+
-```
+## What This Agent Does
 
-## Live Deployment
+**Ripple DevOps Agent** automates the process of fixing failing tests in a codebase:
 
-- **Frontend**: Deploy to Vercel (connect repo, set root to `frontend`)
-- **Backend**: Deploy to Railway (connect repo, set root to `backend`)
+1. **Creates a branch** in format `TEAM_LEADER_AI_Fix`
+2. **Runs tests** inside a Docker container (safe, isolated)
+3. **If tests fail**, uses Gemini AI to:
+   - Analyze the failure output
+   - Identify the root cause and file to fix
+   - Propose a code fix
+   - Apply the fix and commit
+4. **Repeats** until tests pass or retry limit is reached
+5. **Generates a report** (score, fixes applied, timeline) shown in the dashboard
 
-## Installation
+**Use case**: You have a Node.js project with failing `npm test`. Give the agent the repo path; it will iteratively fix bugs until tests pass or it gives up.
+
+---
+
+## Deployed on Vercel (Frontend + Backend)
+
+You have both frontend and backend on Vercel. Follow these steps to make it work.
+
+### Step 1: Get a Gemini API Key (Free)
+
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Sign in with your Google account
+3. Click **Create API Key**
+4. Copy the key (starts with `AIza...`)
+
+### Step 2: Add Environment Variables in Vercel
+
+You need **two Vercel projects** (one for frontend, one for backend) or a monorepo setup. Add variables as follows.
+
+#### Backend Project (API)
+
+1. Open [Vercel Dashboard](https://vercel.com/dashboard)
+2. Select your **backend** project
+3. Go to **Settings** → **Environment Variables**
+4. Add:
+
+| Name | Value | Environments |
+|------|-------|--------------|
+| `GEMINI_API_KEY` | `your_gemini_api_key_here` | Production, Preview |
+| `RETRY_LIMIT` | `5` | Production, Preview (optional) |
+
+5. Click **Save**
+
+#### Frontend Project (Dashboard)
+
+1. Select your **frontend** project
+2. Go to **Settings** → **Environment Variables**
+3. Add:
+
+| Name | Value | Environments |
+|------|-------|--------------|
+| `VITE_API_URL` | `https://your-backend-url.vercel.app` | Production, Preview |
+
+Replace `your-backend-url.vercel.app` with your actual backend deployment URL (e.g. from Vercel after deploying the backend).
+
+4. Click **Save**
+
+### Step 3: Redeploy After Adding Variables
+
+- Vercel does **not** apply new env vars to existing deployments.
+- Go to **Deployments** → click **⋯** on the latest → **Redeploy**
+- Or push a small commit to trigger a new deploy
+
+### Step 4: Verify
+
+1. Open your **frontend** URL
+2. Dashboard should load (may show "No results yet")
+3. Backend must be reachable: `https://your-backend.vercel.app/api/health` should return `{"ok":true,...}`
+
+---
+
+## Important: Vercel Limitations for Backend
+
+The agent is designed to **run tests inside Docker** and can run for several minutes. Vercel serverless functions:
+
+- **Timeout**: 10 seconds (Hobby) or 60 seconds (Pro)
+- **No Docker**: Cannot run `docker run` inside Vercel
+- **Stateless**: Long background jobs are stopped when the function returns
+
+**Result**: `POST /api/run-agent` will **not** complete successfully on Vercel. The dashboard will work, but running the agent will fail.
+
+**For full agent functionality**, host the backend on a platform that supports Docker and long-running processes:
+
+- **Railway** – supports Docker and long-running Node apps
+- **Render** – supports Docker
+- **Fly.io** – supports Docker
+
+Use Vercel for the frontend and one of the above for the backend. Set `VITE_API_URL` to the Railway/Render/Fly backend URL.
+
+---
+
+## Environment Variables Reference
+
+### Backend (`.env` or Vercel / Railway / Render)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GEMINI_API_KEY` | Yes | From [Google AI Studio](https://makersuite.google.com/app/apikey). Free tier works. |
+| `RETRY_LIMIT` | No | Max fix iterations per run. Default: `5`. |
+| `PORT` | No | Server port. Default: `3001`. Vercel sets this automatically. |
+
+### Frontend
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VITE_API_URL` | Yes (for production) | Full backend URL, e.g. `https://your-backend.vercel.app`. No trailing slash. |
+
+**Local dev**: Create `frontend/.env` with `VITE_API_URL=http://localhost:3001` (or omit if backend runs on 3001).
+
+---
+
+## Local Setup (Full Agent)
+
+For full agent runs (including Docker), run locally:
 
 ### Prerequisites
 
 - Node.js 18+
-- Docker (for test execution)
-- Gemini API key (free tier)
+- Docker Desktop (for test execution)
+- Gemini API key
 
 ### Backend
 
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env and add GEMINI_API_KEY
+# Edit .env: add GEMINI_API_KEY=your_key
 npm install
 npm start
 ```
@@ -56,97 +147,70 @@ npm install
 npm run dev
 ```
 
-### Environment Variables
+Open http://localhost:5173. Enter a **local repo path** (e.g. `/Users/you/projects/my-app`) and click **Run Agent**.
 
-Create `.env` in `/backend`:
+---
+
+## Architecture
 
 ```
-GEMINI_API_KEY=your_key_here
-RETRY_LIMIT=5
-PORT=3001
++------------------------+     REST      +------------------------+
+|  React Dashboard       | <-----------> |  Express Backend       |
+|  (Vercel)              |   /api/*      |  (Vercel / Railway)    |
++------------------------+               +------------------------+
+                                                  |
+                                                  v
+                                         +------------------+
+                                         |  Agent Pipeline  |
+                                         +------------------+
+                                                  |
+     +----------------+----------------+----------+----------+
+     |                |                |                     |
+     v                v                v                     v
++----------+   +------------+   +------------+   +----------------+
+| Analyzer |   | Fix Agent  |   | Test Agent |   | Git Agent      |
+| (Gemini) |   | (Gemini)   |   | (Docker)   |   | (simple-git)   |
++----------+   +------------+   +------------+   +----------------+
 ```
 
-- `GEMINI_API_KEY` (required): Get from [Google AI Studio](https://makersuite.google.com/app/apikey). Free tier is sufficient.
-- `RETRY_LIMIT` (optional): Max fix iterations per run. Default: 5.
-- `PORT` (optional): Server port. Default: 3001.
+---
 
-For Railway: open your project → Variables → add `GEMINI_API_KEY` and `RETRY_LIMIT`.
+## Vercel Deployment (Summary)
 
-### Docker Setup
+### Frontend
 
-The agent runs tests inside Docker containers. Ensure Docker is installed and the daemon is running:
-
-```bash
-docker info
-```
-
-Backend must have access to Docker socket when using docker-compose (socket is mounted).
-
-### API Key Setup
-
-1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create an API key
-3. Set `GEMINI_API_KEY=your_key` in backend `.env`
-4. On Railway: Variables → Add Variable → `GEMINI_API_KEY` → paste key
-
-## Railway Deployment
-
-1. Create a new project on [Railway](https://railway.app)
-2. Connect your Git repository
-3. Set root directory to `backend`
-4. Add variables: `GEMINI_API_KEY`, `RETRY_LIMIT` (optional)
+1. Connect repo to Vercel
+2. **Root Directory**: `frontend`
+3. **Framework Preset**: Vite (auto-detected)
+4. Add `VITE_API_URL` = backend URL
 5. Deploy
 
-Railway will detect the Node.js app and run `npm start`.
+### Backend
 
-## Vercel Deployment (Frontend)
-
-1. Import project on [Vercel](https://vercel.com)
-2. Set root directory to `frontend`
-3. Add environment variable: `VITE_API_URL` = your Railway backend URL (e.g. `https://your-app.railway.app`)
+1. New Vercel project, connect same repo
+2. **Root Directory**: `backend`
+3. Add `GEMINI_API_KEY` and optionally `RETRY_LIMIT`
 4. Deploy
 
-## Usage Example
-
-1. Start backend: `cd backend && npm start`
-2. Start frontend: `cd frontend && npm run dev`
-3. Open http://localhost:5173
-4. Enter a local repository path (e.g. `/Users/you/projects/my-app`)
-5. Optionally set team name and leader name for branch format
-6. Click "Run Agent"
-
-The agent will create a branch `TEAMNAME_LEADERNAME_AI_Fix`, run tests in Docker, analyze failures with Gemini, apply fixes, and commit until tests pass or retry limit is reached.
-
-## Supported Bug Types
-
-- Syntax errors in JavaScript/TypeScript
-- Logic errors in test files and source code
-- Missing imports or exports
-- Assertion mismatches
-- Common npm test script failures (Jest, Mocha)
-
-## Known Limitations
-
-- Works with local repository paths only (no remote clone in this version)
-- Docker must be installed and running
-- Gemini free tier has rate limits
-- Does not modify `package.json` for security
-- Best suited for Node.js projects with `npm test`
+---
 
 ## Scoring
 
-- Base: 100
+- Base: **100**
 - +10 if run completes in under 5 minutes
 - -2 per commit above 20
 
 ## Branch Format
 
-`TEAM_NAME_LEADER_NAME_AI_Fix`
+`TEAM_NAME_LEADER_NAME_AI_Fix` — uppercase, underscores, ends with `_AI_Fix`.
 
-- Uppercase
-- Spaces → underscores
-- No special characters
-- Ends with `_AI_Fix`
+## Supported Bug Types
+
+- Syntax errors (JavaScript/TypeScript)
+- Logic errors in source and tests
+- Missing imports/exports
+- Assertion mismatches
+- Jest/Mocha test failures
 
 ## Project Structure
 
@@ -160,4 +224,4 @@ The agent will create a branch `TEAMNAME_LEADERNAME_AI_Fix`, run tests in Docker
 
 ## Team
 
-Autonomous DevOps Agent - Open Source
+Ripple DevOps Agent – Open Source

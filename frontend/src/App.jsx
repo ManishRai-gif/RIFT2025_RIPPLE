@@ -15,7 +15,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>DevOps Agent</h1>
+        <h1>Ripple DevOps Agent</h1>
         <span className="tag">Autonomous CI Fix</span>
       </header>
       {error && (
