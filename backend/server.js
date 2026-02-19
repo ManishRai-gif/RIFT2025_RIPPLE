@@ -27,43 +27,6 @@ app.post('/api/run-agent', async (req, res) => {
       return res.status(400).json({ error: 'Repository URL or path required' });
     }
 
-    // On Vercel/serverless, heavy cloning + Docker + CI loops are not reliable.
-    // To keep the deployed demo responsive, short-circuit with a fast simulated
-    // result instead of running the full orchestrator.
-    if (process.env.VERCEL) {
-      const now = Date.now();
-      const results = {
-        repo: repoInput,
-        team_name: teamName || 'Team',
-        team_leader: leaderName || 'Leader',
-        branch: 'DEMO_BRANCH',
-        total_failures: 0,
-        total_fixes: 0,
-        ci_status: 'PASSED',
-        iterations_used: 1,
-        retry_limit: config.retryLimit,
-        score: 100,
-        total_time_ms: 500,
-        score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
-        fixes: [],
-        timeline: [
-          { time: 0, event: 'START' },
-          { time: 200, event: 'TEST_RUN', iteration: 1, passed: true },
-          { time: 500, event: 'DONE' },
-        ],
-        run_log: [
-          { t: 0, msg: 'Received repository. Skipping heavy CI run on Vercel demo.' },
-          { t: 150, msg: 'Simulated tests passed (Docker not available on Vercel).' },
-          { t: 400, msg: 'Computed demo score = 100.' },
-        ],
-      };
-      lastResults = results;
-      try {
-        fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify(results, null, 2), 'utf8');
-      } catch {}
-      return res.status(200).json(results);
-    }
-
     let repoPath = null;
     let displayRepo = repoInput;
 

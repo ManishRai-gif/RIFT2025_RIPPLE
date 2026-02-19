@@ -168,6 +168,17 @@ export default function Dashboard() {
           <pre className="run-log-pre">{results.run_log.map((l, i) => `+${l.t}ms ${l.msg} ${l.file || ''} ${l.line ? 'L' + l.line : ''} ${l.bugType || ''}`).join('\n')}</pre>
         </div>
       )}
+      {results.analysis_summary && (
+        <div className="card analysis-card">
+          <h3>AI Analysis of Repository</h3>
+          <p className="muted">
+            Deep read of the repo using Gemini based on the README and metadata.
+          </p>
+          <pre className="analysis-pre">
+            {results.analysis_summary}
+          </pre>
+        </div>
+      )}
       <div className="card timeline-card">
         <h3>CI/CD Status Timeline</h3>
         <div className="timeline-header">
