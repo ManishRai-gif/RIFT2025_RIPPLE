@@ -8,10 +8,14 @@ export default function App() {
   const { loadResults, error, running } = useAgent();
 
   useEffect(() => {
-    loadResults();
-    const id = setInterval(loadResults, 5000);
-    return () => clearInterval(id);
+    loadResults(false);
   }, [loadResults]);
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => loadResults(true), 2500);
+    return () => clearInterval(id);
+  }, [running, loadResults]);
 
   return (
     <div className="app">

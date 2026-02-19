@@ -9,19 +9,23 @@ export function AgentProvider({ children }) {
   const [error, setError] = useState(null);
   const [running, setRunning] = useState(false);
 
-  const loadResults = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const loadResults = useCallback(async (isBackgroundRefresh = false) => {
+    if (!isBackgroundRefresh) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await fetchResults();
       setResults(data);
     } catch (err) {
-      const msg = `Cannot reach backend at ${getApiBase()}. Check VITE_API_URL.`;
-      setError(msg);
-      setResults(null);
-      console.warn('[Agent] loadResults failed:', err);
+      if (!isBackgroundRefresh) {
+        const msg = `Cannot reach backend at ${getApiBase()}. Check VITE_API_URL.`;
+        setError(msg);
+        setResults(null);
+        console.warn('[Agent] loadResults failed:', err);
+      }
     } finally {
-      setLoading(false);
+      if (!isBackgroundRefresh) setLoading(false);
     }
   }, []);
 
