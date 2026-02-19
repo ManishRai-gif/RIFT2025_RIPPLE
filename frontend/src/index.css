@@ -109,22 +109,22 @@ body::before {
   margin: 0 auto 1.5rem;
 }
 
+.loading-spinner {
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 3px solid rgba(99, 102, 241, 0.2);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+
 .loading-orb {
   position: absolute;
-  inset: 0;
+  inset: 12px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%);
   box-shadow: 0 0 40px var(--accent-glow);
   animation: orbPulse 2s ease-in-out infinite;
-}
-
-.loading-pulse {
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  border: 2px solid var(--accent);
-  opacity: 0;
-  animation: pulseRing 2s ease-out infinite;
 }
 
 .loading-overlay-content h3 {

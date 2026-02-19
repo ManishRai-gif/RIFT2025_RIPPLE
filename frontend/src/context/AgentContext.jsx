@@ -28,6 +28,26 @@ export function AgentProvider({ children }) {
     setError(null);
     try {
       await runAgent({ repo, teamName, leaderName });
+      const startTime = Date.now();
+      const TIMEOUT_MS = 10 * 60 * 1000;
+      const POLL_MS = 2000;
+
+      const poll = async () => {
+        try {
+          const data = await fetchResults();
+          setResults(data);
+          const r = String(data.repo || '').trim();
+          const submitted = String(repo || '').trim();
+          const repoMatch = !submitted || r === submitted || r.endsWith(submitted) || submitted.endsWith(r);
+          const done = data.ci_status === 'PASSED' || data.ci_status === 'FAILED' || data.error;
+          if (repoMatch && done) return true;
+        } catch {}
+        return Date.now() - startTime > TIMEOUT_MS;
+      };
+
+      while (!(await poll())) {
+        await new Promise((r) => setTimeout(r, POLL_MS));
+      }
     } catch (err) {
       setError(err.message || 'Failed to start agent');
     } finally {

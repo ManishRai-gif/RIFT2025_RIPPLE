@@ -7,8 +7,8 @@ export default function LoadingOverlay({ visible }) {
     <div className="loading-overlay">
       <div className="loading-overlay-content">
         <div className="loading-orb-wrap">
+          <div className="loading-spinner" />
           <div className="loading-orb" />
-          <div className="loading-pulse" />
         </div>
         <h3>Agent is running</h3>
         <p>Cloning repo, running tests, and applying fixes…</p>
