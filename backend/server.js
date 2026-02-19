@@ -1,14 +1,17 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
 const config = require('./config');
 const { run } = require('./agents/orchestrator');
 const { cloneToTemp, isGitHubUrl, removeDir } = require('./utils/cloneRepo');
+const { read, write, EMPTY_RESULTS, failurePayload } = require('./utils/resultsStore');
 const logger = require('./utils/logger');
 
 const app = express();
-app.use(cors());
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({ origin: true }));
 app.use(express.json({ limit: '1mb' }));
 
 app.post('/api/run-agent', async (req, res) => {
@@ -32,24 +35,12 @@ app.post('/api/run-agent', async (req, res) => {
       const cloneResult = await cloneToTemp(repoInput);
       if (!cloneResult.success) {
         logger.error('run-agent: clone failed', cloneResult.error);
-        const results = {
+        write(failurePayload({
           repo: repoInput,
           team_name: teamName || '',
           team_leader: leaderName || '',
-          branch: '',
-          ci_status: 'FAILED',
-          total_failures: 0,
-          total_fixes: 0,
-          iterations_used: 0,
-          retry_limit: config.retryLimit,
-          score: 0,
-          total_time_ms: 0,
-          score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
-          fixes: [],
-          timeline: [],
           error: cloneResult.error,
-        };
-        fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify(results, null, 2), 'utf8');
+        }));
         return;
       }
       repoPath = cloneResult.path;
@@ -68,58 +59,24 @@ app.post('/api/run-agent', async (req, res) => {
 
     logger.info('run-agent: starting orchestrator');
     const results = await run(repoPath, teamName || 'Team', leaderName || 'Leader', displayRepo);
-    logger.info('Run completed:', results.ci_status, 'score:', results.score, 'wrote results.json');
+    write(results);
+    logger.info('Run completed:', results.ci_status, 'score:', results.score);
   } catch (err) {
     logger.error('run-agent error:', err.message);
-    try {
-      fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify({
-        repo: req.body?.repo || '',
-        team_name: req.body?.teamName || '',
-        team_leader: req.body?.leaderName || '',
-        branch: '',
-        ci_status: 'FAILED',
-        total_failures: 0,
-        total_fixes: 0,
-        iterations_used: 0,
-        retry_limit: config.retryLimit,
-        score: 0,
-        total_time_ms: 0,
-        score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
-        fixes: [],
-        timeline: [],
-        error: err.message,
-      }, null, 2), 'utf8');
-    } catch {}
+    write(failurePayload({
+      repo: req.body?.repo || '',
+      team_name: req.body?.teamName || '',
+      team_leader: req.body?.leaderName || '',
+      error: err.message,
+    }));
   } finally {
     if (tempDir) removeDir(tempDir);
   }
 });
 
-const EMPTY_RESULTS = Object.freeze({
-  repo: '',
-  team_name: '',
-  team_leader: '',
-  branch: '',
-  total_failures: 0,
-  total_fixes: 0,
-  ci_status: '',
-  iterations_used: 0,
-  retry_limit: 5,
-  score: 0,
-  total_time_ms: 0,
-  score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
-  fixes: [],
-  timeline: [],
-  run_log: [],
-});
-
 app.get('/api/results', (req, res) => {
   try {
-    const resultsPath = path.join(__dirname, 'results.json');
-    if (!fs.existsSync(resultsPath)) {
-      return res.json(EMPTY_RESULTS);
-    }
-    const data = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+    const data = read();
     res.json(data);
   } catch (err) {
     logger.error('results error:', err.message);

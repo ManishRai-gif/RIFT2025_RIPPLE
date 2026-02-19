@@ -3,10 +3,11 @@ const path = require('path');
 const { analyzeBug } = require('./analyzerAgent');
 const { runTests } = require('./testAgent');
 const { proposeFix, applyFix } = require('./fixAgent');
-const { createBranch, commit, push, getCommitCount, formatBranchName } = require('./gitAgent');
+const { createBranch, commit, getCommitCount, formatBranchName } = require('./gitAgent');
 const { getCIStatus } = require('./ciAgent');
 const config = require('../config');
 const logger = require('../utils/logger');
+const resultsStore = require('../utils/resultsStore');
 
 function extractFilePath(testOutput) {
   const m = testOutput.match(/(?:at|in)\s+[\w.]+\s+\(([^)]+)\)|(\/[\w./-]+\.(?:js|ts|jsx|tsx|py))/);
@@ -33,9 +34,7 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRe
   };
   const writePartial = (status, iter = 0) => {
     const r = buildResults(displayRepo || repoPath, branch, totalFailures, totalFixes, status, iter, config.retryLimit, 0, fixes, timeline, null, teamName, leaderName, Date.now() - startTime, null, runLog);
-    try {
-      fs.writeFileSync(path.join(__dirname, '..', 'results.json'), JSON.stringify(r, null, 2), 'utf8');
-    } catch (e) {}
+    resultsStore.write(r);
   };
 
   try {
@@ -151,15 +150,9 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRe
     const { score, breakdown } = computeScoreWithBreakdown(elapsed, commits);
 
     const repoDisplay = displayRepo || repoPath;
-    const { isGitHubUrl } = require('../utils/cloneRepo');
-    if (isGitHubUrl(repoDisplay)) {
-      addLog('Pushing to remote');
-      const pushResult = await push(repoPath, branch, repoDisplay);
-      if (pushResult.success) addLog('Push complete'); else addLog('Push failed', { error: pushResult.error });
-    }
+    addLog('Run complete – commits are on branch locally (no push to main)');
     const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, ciStatus, iterations, config.retryLimit, score, fixes, timeline, null, teamName, leaderName, totalTimeMs, breakdown, runLog);
-    const resultsPath = path.join(__dirname, '..', 'results.json');
-    fs.writeFileSync(resultsPath, JSON.stringify(results, null, 2), 'utf8');
+    resultsStore.write(results);
     addTimeline('DONE');
     return results;
   } catch (err) {
@@ -167,9 +160,7 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRe
     const totalTimeMs = Date.now() - startTime;
     const repoDisplay = displayRepo || repoPath;
     const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, 'FAILED', 0, config.retryLimit, 0, fixes, timeline, null, teamName, leaderName, totalTimeMs, { base: 100, speed_bonus: 0, efficiency_penalty: 0 }, runLog);
-    try {
-      fs.writeFileSync(path.join(__dirname, '..', 'results.json'), JSON.stringify(results, null, 2), 'utf8');
-    } catch {}
+    resultsStore.write(results);
     return results;
   }
 }

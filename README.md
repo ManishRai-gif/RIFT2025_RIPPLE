@@ -213,6 +213,13 @@ Open http://localhost:5173. Enter a **local repo path** (e.g. `/Users/you/projec
 - Assertion mismatches
 - Jest/Mocha test failures
 
+## Where results and logs are saved
+
+- **Backend**: Every run writes to `backend/results.json`. The file is updated during the run (so the dashboard can show progress) and again at the end with the final result.
+- **Contents**: `repo`, `branch`, `ci_status`, `fixes`, `timeline`, **`run_log`** (each step: tests, analysis, file/line, fix applied, commit), and score breakdown.
+- **Dashboard**: The frontend polls `GET /api/results` and displays that data; the Run Log section shows the same `run_log` (checks and updates).
+- **Git**: The agent only **commits locally** on the new branch (`TEAM_LEADER_AI_Fix`). It does **not** push to GitHub and does **not** change `main`. For a **local path** run, the developer sees the new branch and commits in their repo. No GitHub token is required.
+
 ## Project Structure
 
 ```
@@ -220,7 +227,7 @@ Open http://localhost:5173. Enter a **local repo path** (e.g. `/Users/you/projec
 /backend           Express API + agents
   /agents          analyzerAgent, testAgent, fixAgent, gitAgent, ciAgent, orchestrator
   /utils           gemini, dockerRunner, logger
-  results.json     Generated after each run
+  results.json     Generated after each run (includes run_log)
 ```
 
 ## Team

@@ -11,7 +11,10 @@ function logError(msg, err) {
 
 async function fetchWithRetry(url, options = {}, retries = MAX_RETRIES) {
   const fullUrl = `${API_BASE}${url}`;
-  log('Request', { url: fullUrl, method: options.method || 'GET' });
+  const method = options.method || 'GET';
+  const body = options.body;
+  console.warn('[Agent API] REQUEST', method, fullUrl);
+  if (body) console.warn('[Agent API] REQUEST BODY:', typeof body === 'string' ? body : JSON.stringify(body, null, 2));
   let lastErr;
   for (let i = 0; i <= retries; i++) {
     try {
@@ -20,7 +23,8 @@ async function fetchWithRetry(url, options = {}, retries = MAX_RETRIES) {
         headers: { 'Content-Type': 'application/json', ...options.headers },
       });
       const text = await res.text();
-      log('Response', { status: res.status, url: fullUrl });
+      console.warn('[Agent API] RESPONSE', res.status, fullUrl);
+      console.warn('[Agent API] RESPONSE BODY:', text ? (text.length > 2000 ? text.slice(0, 2000) + '...[truncated]' : text) : '(empty)');
       if (!res.ok) {
         lastErr = new Error(text || `HTTP ${res.status}`);
         logError('Request failed', lastErr.message);
