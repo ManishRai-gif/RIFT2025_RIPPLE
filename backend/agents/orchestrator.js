@@ -3,7 +3,7 @@ const path = require('path');
 const { analyzeBug } = require('./analyzerAgent');
 const { runTests } = require('./testAgent');
 const { proposeFix, applyFix } = require('./fixAgent');
-const { createBranch, commit, getCommitCount, formatBranchName } = require('./gitAgent');
+const { createBranch, commit, push, getCommitCount, formatBranchName } = require('./gitAgent');
 const { getCIStatus } = require('./ciAgent');
 const config = require('../config');
 const logger = require('../utils/logger');
@@ -24,41 +24,60 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRe
   let ciStatus = 'FAILED';
   let branch = formatBranchName(teamName, leaderName);
 
+  const runLog = [];
+  const addLog = (msg, data = {}) => {
+    runLog.push({ t: Date.now() - startTime, msg, ...data });
+  };
   const addTimeline = (event, data = {}) => {
     timeline.push({ time: Date.now() - startTime, event, ...data });
+  };
+  const writePartial = (status, iter = 0) => {
+    const r = buildResults(displayRepo || repoPath, branch, totalFailures, totalFixes, status, iter, config.retryLimit, 0, fixes, timeline, null, teamName, leaderName, Date.now() - startTime, null, runLog);
+    try {
+      fs.writeFileSync(path.join(__dirname, '..', 'results.json'), JSON.stringify(r, null, 2), 'utf8');
+    } catch (e) {}
   };
 
   try {
     if (!repoPath || !fs.existsSync(repoPath)) {
-      return buildResults(repoPath, branch, 0, 0, 'FAILED', 0, config.retryLimit, 0, [], [], null, teamName, leaderName, 0, { base: 100, speed_bonus: 0, efficiency_penalty: 0 });
+      return buildResults(repoPath, branch, 0, 0, 'FAILED', 0, config.retryLimit, 0, [], [], null, teamName, leaderName, 0, { base: 100, speed_bonus: 0, efficiency_penalty: 0 }, []);
     }
 
+    addLog('Starting');
     addTimeline('START');
     const branchResult = await createBranch(repoPath, teamName, leaderName);
     if (branchResult.success) branch = branchResult.branch;
+    addLog('Branch created', { branch });
     addTimeline('BRANCH_CREATED', { branch });
+    writePartial('RUNNING', 0);
 
     let iterations = 0;
     let lastOutput = '';
 
     while (iterations < config.retryLimit) {
       iterations++;
+      addLog(`Iteration ${iterations}: Running tests`);
       addTimeline('TEST_START', { iteration: iterations });
+      writePartial('RUNNING', iterations);
 
       const testResult = await runTests(repoPath);
       lastOutput = testResult.stdout || '';
 
       if (testResult.success) {
         ciStatus = 'PASSED';
+        addLog('All tests passed');
         addTimeline('TEST_RUN', { iteration: iterations, passed: true });
         break;
       }
 
       totalFailures++;
+      addLog(`Iteration ${iterations}: Tests failed`);
       addTimeline('TEST_RUN', { iteration: iterations, passed: false });
+      writePartial('RUNNING', iterations);
 
       let analysis = { rootCause: 'Unknown', file: '', suggestion: '', confidence: 0 };
       try {
+        addLog('Analyzing failure with Gemini');
         analysis = await analyzeBug(repoPath, lastOutput);
       } catch (err) {
         logger.error('Analyzer failed:', err.message);
@@ -67,7 +86,9 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRe
       }
 
       const fileToFix = analysis.file || extractFilePath(lastOutput);
+      addLog('Analysis', { file: fileToFix, line: analysis.line, bugType: analysis.bugType, rootCause: analysis.rootCause });
       if (!fileToFix) {
+        addLog('No file identified');
         fixes.push({ file: '—', bug_type: '—', line_number: null, commit_message: 'No file identified', status: 'Failed' });
         continue;
       }
@@ -108,10 +129,15 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRe
         commit_message: commitMsg,
         status: 'Fixed',
       });
+      addLog('Fix applied', { file: fix.file, line: analysis.line, bugType: analysis.bugType });
       addTimeline('FIX_APPLIED', { file: fix.file });
+      writePartial('RUNNING', iterations);
 
       const commitResult = await commit(repoPath, commitMsg);
-      if (commitResult.success) addTimeline('COMMIT', { iteration: iterations });
+      if (commitResult.success) {
+        addLog('Committed', { message: commitMsg });
+        addTimeline('COMMIT', { iteration: iterations });
+      }
     }
 
     if (ciStatus !== 'PASSED') {
@@ -125,7 +151,13 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRe
     const { score, breakdown } = computeScoreWithBreakdown(elapsed, commits);
 
     const repoDisplay = displayRepo || repoPath;
-    const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, ciStatus, iterations, config.retryLimit, score, fixes, timeline, null, teamName, leaderName, totalTimeMs, breakdown);
+    const { isGitHubUrl } = require('../utils/cloneRepo');
+    if (isGitHubUrl(repoDisplay)) {
+      addLog('Pushing to remote');
+      const pushResult = await push(repoPath, branch, repoDisplay);
+      if (pushResult.success) addLog('Push complete'); else addLog('Push failed', { error: pushResult.error });
+    }
+    const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, ciStatus, iterations, config.retryLimit, score, fixes, timeline, null, teamName, leaderName, totalTimeMs, breakdown, runLog);
     const resultsPath = path.join(__dirname, '..', 'results.json');
     fs.writeFileSync(resultsPath, JSON.stringify(results, null, 2), 'utf8');
     addTimeline('DONE');
@@ -134,7 +166,7 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRe
     logger.error('orchestrator error:', err.message);
     const totalTimeMs = Date.now() - startTime;
     const repoDisplay = displayRepo || repoPath;
-    const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, 'FAILED', 0, config.retryLimit, 0, fixes, timeline, null, teamName, leaderName, totalTimeMs, { base: 100, speed_bonus: 0, efficiency_penalty: 0 });
+    const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, 'FAILED', 0, config.retryLimit, 0, fixes, timeline, null, teamName, leaderName, totalTimeMs, { base: 100, speed_bonus: 0, efficiency_penalty: 0 }, runLog);
     try {
       fs.writeFileSync(path.join(__dirname, '..', 'results.json'), JSON.stringify(results, null, 2), 'utf8');
     } catch {}
@@ -153,7 +185,7 @@ function computeScoreWithBreakdown(elapsedMinutes, commitCount) {
   };
 }
 
-function buildResults(repo, branch, totalFailures, totalFixes, ciStatus, iterationsUsed, retryLimit, score, fixes, timeline, startTime, teamName, leaderName, totalTimeMs, scoreBreakdown) {
+function buildResults(repo, branch, totalFailures, totalFixes, ciStatus, iterationsUsed, retryLimit, score, fixes, timeline, startTime, teamName, leaderName, totalTimeMs, scoreBreakdown, runLog = []) {
   return {
     repo: repo || '',
     team_name: teamName || '',
@@ -169,6 +201,7 @@ function buildResults(repo, branch, totalFailures, totalFixes, ciStatus, iterati
     score_breakdown: scoreBreakdown || { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
     fixes: Array.isArray(fixes) ? fixes : [],
     timeline: Array.isArray(timeline) ? timeline : [],
+    run_log: Array.isArray(runLog) ? runLog : [],
   };
 }
 

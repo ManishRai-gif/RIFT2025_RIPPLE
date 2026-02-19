@@ -158,6 +158,12 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {Array.isArray(results.run_log) && results.run_log.length > 0 && (
+        <div className="card run-log-card">
+          <h3>Run Log (checks & updates)</h3>
+          <pre className="run-log-pre">{results.run_log.map((l, i) => `+${l.t}ms ${l.msg} ${l.file || ''} ${l.line ? 'L' + l.line : ''} ${l.bugType || ''}`).join('\n')}</pre>
+        </div>
+      )}
       <div className="card timeline-card">
         <h3>CI/CD Status Timeline</h3>
         <div className="timeline-header">

@@ -19,7 +19,7 @@ export function AgentProvider({ children }) {
       const msg = `Cannot reach backend at ${getApiBase()}. Check VITE_API_URL.`;
       setError(msg);
       setResults(null);
-      console.error('[Agent] loadResults failed:', err);
+      console.warn('[Agent] loadResults failed:', err);
     } finally {
       setLoading(false);
     }
@@ -28,10 +28,10 @@ export function AgentProvider({ children }) {
   const triggerRun = useCallback(async (repo, teamName, leaderName) => {
     setRunning(true);
     setError(null);
-    console.log('[Agent] Starting run:', { repo, teamName, leaderName });
+    console.warn('[Agent] Starting run:', { repo, teamName, leaderName });
     try {
       const res = await runAgent({ repo, teamName, leaderName });
-      console.log('[Agent] Run started, response:', res);
+      console.warn('[Agent] Run started, response:', res);
       const startTime = Date.now();
       const TIMEOUT_MS = 10 * 60 * 1000;
       const POLL_MS = 2000;
@@ -43,15 +43,16 @@ export function AgentProvider({ children }) {
           const data = await fetchResults();
           setResults(data);
           const done = data.ci_status === 'PASSED' || data.ci_status === 'FAILED' || data.error;
+          if (data.run_log && data.run_log.length > 0) {
+            console.warn('[Agent] Run log:', data.run_log.map(l => `+${l.t}ms ${l.msg} ${l.file ? l.file : ''} ${l.line ? 'L' + l.line : ''} ${l.bugType ? l.bugType : ''}`).join('\n'));
+          }
           if (done) {
-            console.log('[Agent] Run complete:', data.ci_status, data);
+            console.warn('[Agent] Run complete:', data.ci_status, 'fixes:', data.fixes?.length, data);
             return true;
           }
-          if (pollCount % 5 === 0) {
-            console.log('[Agent] Polling...', pollCount, 'ci_status:', data.ci_status || 'pending');
-          }
+          console.warn('[Agent] Poll', pollCount, 'ci_status:', data.ci_status || 'pending', 'log entries:', data.run_log?.length || 0);
         } catch (e) {
-          console.error('[Agent] Poll error:', e);
+          console.warn('[Agent] Poll error:', e);
         }
         return Date.now() - startTime > TIMEOUT_MS;
       };
@@ -62,7 +63,7 @@ export function AgentProvider({ children }) {
     } catch (err) {
       const msg = err.message || 'Failed to start agent';
       setError(msg);
-      console.error('[Agent] Run failed:', err);
+      console.warn('[Agent] Run failed:', err);
     } finally {
       setRunning(false);
     }

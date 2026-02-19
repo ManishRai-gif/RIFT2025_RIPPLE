@@ -3,10 +3,10 @@ const RETRY_DELAY = 2000;
 const MAX_RETRIES = 2;
 
 function log(msg, data) {
-  console.log(`[Agent API] ${msg}`, data !== undefined ? data : '');
+  console.warn(`[Agent API] ${msg}`, data !== undefined ? data : '');
 }
 function logError(msg, err) {
-  console.error(`[Agent API] ${msg}`, err);
+  console.warn(`[Agent API] ERROR ${msg}`, err);
 }
 
 async function fetchWithRetry(url, options = {}, retries = MAX_RETRIES) {

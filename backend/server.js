@@ -110,6 +110,7 @@ const EMPTY_RESULTS = Object.freeze({
   score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
   fixes: [],
   timeline: [],
+  run_log: [],
 });
 
 app.get('/api/results', (req, res) => {

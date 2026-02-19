@@ -43,6 +43,24 @@ async function commit(repoPath, message) {
   }
 }
 
+async function push(repoPath, branch, remoteUrl) {
+  const config = require('../config');
+  const token = config.githubToken;
+  if (!token || !remoteUrl) return { success: false, error: 'GITHUB_TOKEN not set - add to env for push' };
+  try {
+    const git = simpleGit(repoPath);
+    const authUrl = String(remoteUrl).replace(/^https:\/\//, `https://x-access-token:${token}@`).replace(/^http:\/\//, `http://x-access-token:${token}@`);
+    await git.removeRemote('agent-push').catch(() => {});
+    await git.addRemote('agent-push', authUrl);
+    await git.push('agent-push', branch, ['--force']);
+    await git.removeRemote('agent-push').catch(() => {});
+    return { success: true };
+  } catch (err) {
+    logger.error('gitAgent push error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 async function getCommitCount(repoPath) {
   try {
     const git = simpleGit(repoPath);
@@ -53,4 +71,4 @@ async function getCommitCount(repoPath) {
   }
 }
 
-module.exports = { createBranch, commit, getCommitCount, formatBranchName };
+module.exports = { createBranch, commit, push, getCommitCount, formatBranchName };

@@ -545,6 +545,16 @@ body::before {
 
 .timeline-iter { font-weight: 500; }
 .timeline-status { font-size: 0.85rem; }
+.run-log-pre {
+  margin: 0;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 .timeline-ts {
   margin-left: auto;
   font-family: var(--font-mono);
