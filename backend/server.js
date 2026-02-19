@@ -11,6 +11,10 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
+// Keep the latest results in memory so the frontend can still
+// show logs even if the results.json file is not available.
+let lastResults = null;
+
 app.post('/api/run-agent', async (req, res) => {
   let tempDir = null;
   logger.info('run-agent received:', JSON.stringify(req.body));
@@ -69,10 +73,11 @@ app.post('/api/run-agent', async (req, res) => {
     logger.info('run-agent: starting orchestrator');
     const results = await run(repoPath, teamName || 'Team', leaderName || 'Leader', displayRepo);
     logger.info('Run completed:', results.ci_status, 'score:', results.score, 'wrote results.json');
+    lastResults = results;
   } catch (err) {
     logger.error('run-agent error:', err.message);
     try {
-      fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify({
+      const errorResults = {
         repo: req.body?.repo || '',
         team_name: req.body?.teamName || '',
         team_leader: req.body?.leaderName || '',
@@ -87,8 +92,11 @@ app.post('/api/run-agent', async (req, res) => {
         score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
         fixes: [],
         timeline: [],
+        run_log: [],
         error: err.message,
-      }, null, 2), 'utf8');
+      };
+      lastResults = errorResults;
+      fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify(errorResults, null, 2), 'utf8');
     } catch {}
   } finally {
     if (tempDir) removeDir(tempDir);
@@ -117,12 +125,21 @@ app.get('/api/results', (req, res) => {
   try {
     const resultsPath = path.join(__dirname, 'results.json');
     if (!fs.existsSync(resultsPath)) {
+      // If we have in-memory results from this instance, prefer them.
+      if (lastResults) {
+        return res.json(lastResults);
+      }
       return res.json(EMPTY_RESULTS);
     }
     const data = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+    lastResults = data;
     res.json(data);
   } catch (err) {
     logger.error('results error:', err.message);
+    // Fall back to the last known results if available.
+    if (lastResults) {
+      return res.json(lastResults);
+    }
     res.json(EMPTY_RESULTS);
   }
 });

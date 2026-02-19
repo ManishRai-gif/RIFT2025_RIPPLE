@@ -5,7 +5,7 @@ import RunForm from './components/RunForm';
 import LoadingOverlay from './components/LoadingOverlay';
 
 export default function App() {
-  const { loadResults, error, running } = useAgent();
+  const { loadResults, error, running, loading } = useAgent();
 
   useEffect(() => {
     loadResults();
@@ -15,7 +15,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <LoadingOverlay visible={running} />
+      <LoadingOverlay visible={running || (loading && !error)} />
       <header className="header">
         <h1>Ripple DevOps Agent</h1>
         <span className="tag">Autonomous CI Fix</span>
