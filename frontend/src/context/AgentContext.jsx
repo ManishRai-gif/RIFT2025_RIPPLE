@@ -16,7 +16,7 @@ export function AgentProvider({ children }) {
       const data = await fetchResults();
       setResults(data);
     } catch (err) {
-      setError(err.message || 'Failed to load results');
+      setError('Cannot reach backend. Set VITE_API_URL to your backend URL.');
       setResults(null);
     } finally {
       setLoading(false);

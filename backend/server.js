@@ -62,17 +62,30 @@ app.post('/api/run-agent', async (req, res) => {
   }
 });
 
+const EMPTY_RESULTS = Object.freeze({
+  repo: '',
+  branch: '',
+  total_failures: 0,
+  total_fixes: 0,
+  ci_status: '',
+  iterations_used: 0,
+  retry_limit: 5,
+  score: 0,
+  fixes: [],
+  timeline: [],
+});
+
 app.get('/api/results', (req, res) => {
   try {
     const resultsPath = path.join(__dirname, 'results.json');
     if (!fs.existsSync(resultsPath)) {
-      return res.status(404).json({ error: 'No results yet' });
+      return res.json(EMPTY_RESULTS);
     }
     const data = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
     res.json(data);
   } catch (err) {
     logger.error('results error:', err.message);
-    res.status(500).json({ error: 'Failed to load results' });
+    res.json(EMPTY_RESULTS);
   }
 });
 

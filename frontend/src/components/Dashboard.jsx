@@ -23,11 +23,29 @@ export default function Dashboard() {
     );
   }
 
+  const isEmpty = !results || (results.ci_status === '' && !results.repo);
+
   if (!results) {
     return (
       <section className="dashboard">
         <div className="card" style={{ animationDelay: '0.1s' }}>
-          <p className="muted">No results yet. Run the agent to get started.</p>
+          <p className="muted">Cannot load results. Check that the backend is running and VITE_API_URL is set.</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <section className="dashboard">
+        <div className="card info-card">
+          <h3>What the agent checks</h3>
+          <ul className="check-list">
+            <li>Node.js projects with <code>npm test</code> (Jest, Mocha, etc.)</li>
+            <li>Syntax errors, logic bugs, missing imports</li>
+            <li>Test output and stack traces to find root cause</li>
+          </ul>
+          <p className="muted">Enter a GitHub URL above and click Run Agent. Results will appear here after a run completes.</p>
         </div>
       </section>
     );
