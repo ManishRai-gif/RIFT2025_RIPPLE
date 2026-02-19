@@ -13,11 +13,13 @@ app.use(express.json({ limit: '1mb' }));
 
 app.post('/api/run-agent', async (req, res) => {
   let tempDir = null;
+  logger.info('run-agent received:', JSON.stringify(req.body));
   try {
     const { repo, teamName, leaderName } = req.body || {};
     const repoInput = typeof repo === 'string' ? repo.trim() : '';
 
     if (!repoInput) {
+      logger.warn('run-agent: missing repo');
       return res.status(400).json({ error: 'Repository URL or path required' });
     }
 
@@ -25,9 +27,11 @@ app.post('/api/run-agent', async (req, res) => {
     let displayRepo = repoInput;
 
     if (isGitHubUrl(repoInput)) {
+      logger.info('run-agent: cloning GitHub repo', repoInput);
       res.status(202).json({ status: 'started', message: 'Cloning and running agent' });
       const cloneResult = await cloneToTemp(repoInput);
       if (!cloneResult.success) {
+        logger.error('run-agent: clone failed', cloneResult.error);
         const results = {
           repo: repoInput,
           team_name: teamName || '',
@@ -62,8 +66,9 @@ app.post('/api/run-agent', async (req, res) => {
       res.status(202).json({ status: 'started', message: 'Agent run started' });
     }
 
+    logger.info('run-agent: starting orchestrator');
     const results = await run(repoPath, teamName || 'Team', leaderName || 'Leader', displayRepo);
-    logger.info('Run completed:', results.ci_status, 'score:', results.score);
+    logger.info('Run completed:', results.ci_status, 'score:', results.score, 'wrote results.json');
   } catch (err) {
     logger.error('run-agent error:', err.message);
     try {
@@ -129,6 +134,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.listen(config.port, () => {
-  logger.info(`Server running on port ${config.port}`);
-});
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  app.listen(config.port, () => {
+    logger.info(`Server running on port ${config.port}`);
+  });
+}

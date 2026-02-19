@@ -206,6 +206,18 @@ body::before {
   border-bottom: 1px solid rgba(239, 68, 68, 0.2);
 }
 
+.error-hint {
+  font-size: 0.8rem;
+  opacity: 0.9;
+  margin-top: 0.25rem;
+}
+
+.api-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: -0.5rem 0 1rem;
+}
+
 .main {
   flex: 1;
   padding: 1.5rem;

@@ -23,6 +23,7 @@ export default function App() {
       {error && (
         <div className="banner error">
           {error}
+          <div className="error-hint">Open browser DevTools (F12) → Console to see details</div>
         </div>
       )}
       <main className="main">

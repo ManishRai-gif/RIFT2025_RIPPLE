@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { fetchResults, runAgent } from '../api/agentApi';
+import { fetchResults, runAgent, getApiBase } from '../api/agentApi';
 
 const AgentContext = createContext(null);
 
@@ -16,8 +16,10 @@ export function AgentProvider({ children }) {
       const data = await fetchResults();
       setResults(data);
     } catch (err) {
-      setError('Cannot reach backend. Set VITE_API_URL to your backend URL.');
+      const msg = `Cannot reach backend at ${getApiBase()}. Check VITE_API_URL.`;
+      setError(msg);
       setResults(null);
+      console.error('[Agent] loadResults failed:', err);
     } finally {
       setLoading(false);
     }
@@ -26,22 +28,31 @@ export function AgentProvider({ children }) {
   const triggerRun = useCallback(async (repo, teamName, leaderName) => {
     setRunning(true);
     setError(null);
+    console.log('[Agent] Starting run:', { repo, teamName, leaderName });
     try {
-      await runAgent({ repo, teamName, leaderName });
+      const res = await runAgent({ repo, teamName, leaderName });
+      console.log('[Agent] Run started, response:', res);
       const startTime = Date.now();
       const TIMEOUT_MS = 10 * 60 * 1000;
       const POLL_MS = 2000;
+      let pollCount = 0;
 
       const poll = async () => {
+        pollCount++;
         try {
           const data = await fetchResults();
           setResults(data);
-          const r = String(data.repo || '').trim();
-          const submitted = String(repo || '').trim();
-          const repoMatch = !submitted || r === submitted || r.endsWith(submitted) || submitted.endsWith(r);
           const done = data.ci_status === 'PASSED' || data.ci_status === 'FAILED' || data.error;
-          if (repoMatch && done) return true;
-        } catch {}
+          if (done) {
+            console.log('[Agent] Run complete:', data.ci_status, data);
+            return true;
+          }
+          if (pollCount % 5 === 0) {
+            console.log('[Agent] Polling...', pollCount, 'ci_status:', data.ci_status || 'pending');
+          }
+        } catch (e) {
+          console.error('[Agent] Poll error:', e);
+        }
         return Date.now() - startTime > TIMEOUT_MS;
       };
 
@@ -49,7 +60,9 @@ export function AgentProvider({ children }) {
         await new Promise((r) => setTimeout(r, POLL_MS));
       }
     } catch (err) {
-      setError(err.message || 'Failed to start agent');
+      const msg = err.message || 'Failed to start agent';
+      setError(msg);
+      console.error('[Agent] Run failed:', err);
     } finally {
       setRunning(false);
     }

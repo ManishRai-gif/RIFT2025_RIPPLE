@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAgent } from '../context/AgentContext';
+import { getApiBase } from '../api/agentApi';
 
 export default function RunForm() {
   const { triggerRun, running } = useAgent();
@@ -16,6 +17,7 @@ export default function RunForm() {
   return (
     <section className="card run-form">
       <h2>Run Agent</h2>
+      <p className="api-hint">API: {getApiBase()}</p>
       <form onSubmit={handleSubmit}>
         <label>
           GitHub URL or local path
