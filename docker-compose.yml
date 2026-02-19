@@ -1,0 +1,10 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - RETRY_LIMIT=${RETRY_LIMIT:-5}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
