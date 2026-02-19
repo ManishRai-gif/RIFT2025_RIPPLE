@@ -55,7 +55,7 @@ app.post('/api/run-agent', async (req, res) => {
           repo: repoInput,
           team_name: teamName || '',
           team_leader: leaderName || '',
-          error: cloneResult.error,
+          error: cloneResult.error || 'Clone failed (no details)',
         }));
         return;
       }
@@ -88,7 +88,7 @@ app.post('/api/run-agent', async (req, res) => {
         repo: repoInput,
         team_name: teamName || '',
         team_leader: leaderName || '',
-        error: err.message,
+        error: err.message || String(err) || 'Run failed (no details)',
       }));
     } catch (writeErr) {
       logger.error('run-agent: could not write failure payload', writeErr.message);

@@ -643,6 +643,45 @@ body::before {
   word-break: break-word;
 }
 
+.troubleshooting-card {
+  border-color: rgba(234, 179, 8, 0.4);
+  background: rgba(234, 179, 8, 0.06);
+}
+
+.troubleshooting-card h3 {
+  color: var(--warning);
+  margin-top: 0;
+}
+
+.troubleshooting-lead {
+  margin: 0 0 1rem 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.troubleshooting-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.troubleshooting-list li {
+  margin-bottom: 0.5rem;
+}
+
+.troubleshooting-list li strong {
+  color: var(--text);
+}
+
+.troubleshooting-list code {
+  font-size: 0.8rem;
+  background: var(--bg-elevated);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+}
+
 .running-indicator {
   display: flex;
   align-items: center;

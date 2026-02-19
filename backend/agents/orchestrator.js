@@ -159,7 +159,7 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRe
     logger.error('orchestrator error:', err.message);
     const totalTimeMs = Date.now() - startTime;
     const repoDisplay = displayRepo || repoPath;
-    const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, 'FAILED', 0, config.retryLimit, 0, fixes, timeline, null, teamName, leaderName, totalTimeMs, { base: 100, speed_bonus: 0, efficiency_penalty: 0 }, runLog);
+    const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, 'FAILED', 0, config.retryLimit, 0, fixes, timeline, null, teamName, leaderName, totalTimeMs, { base: 100, speed_bonus: 0, efficiency_penalty: 0 }, runLog, err.message || 'Orchestrator error');
     resultsStore.write(results);
     return results;
   }
@@ -176,7 +176,7 @@ function computeScoreWithBreakdown(elapsedMinutes, commitCount) {
   };
 }
 
-function buildResults(repo, branch, totalFailures, totalFixes, ciStatus, iterationsUsed, retryLimit, score, fixes, timeline, startTime, teamName, leaderName, totalTimeMs, scoreBreakdown, runLog = []) {
+function buildResults(repo, branch, totalFailures, totalFixes, ciStatus, iterationsUsed, retryLimit, score, fixes, timeline, startTime, teamName, leaderName, totalTimeMs, scoreBreakdown, runLog = [], error = '') {
   return {
     repo: repo || '',
     team_name: teamName || '',
@@ -193,6 +193,7 @@ function buildResults(repo, branch, totalFailures, totalFixes, ciStatus, iterati
     fixes: Array.isArray(fixes) ? fixes : [],
     timeline: Array.isArray(timeline) ? timeline : [],
     run_log: Array.isArray(runLog) ? runLog : [],
+    error: error || '',
   };
 }
 

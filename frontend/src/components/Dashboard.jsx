@@ -97,6 +97,9 @@ export default function Dashboard() {
   const sb = results.score_breakdown || {};
   const total = results.score ?? 0;
   const timeline = Array.isArray(results.timeline) ? results.timeline : [];
+  const failedEarly =
+    results.ci_status === 'FAILED' &&
+    ((results.total_time_ms ?? 0) === 0 || timeline.length === 0);
 
   return (
     <section className="dashboard">
@@ -104,6 +107,26 @@ export default function Dashboard() {
         <div className="card result-error-card">
           <h3>Error</h3>
           <p className="result-error-text">{results.error}</p>
+        </div>
+      )}
+
+      {failedEarly && (
+        <div className="card troubleshooting-card">
+          <h3>Run failed before completing any steps</h3>
+          <p className="troubleshooting-lead">
+            The agent did not reach tests or fixes. Use the steps below to fix it.
+          </p>
+          <ul className="troubleshooting-list">
+            <li><strong>Repo URL</strong> — Must be a public GitHub URL, e.g. <code>https://github.com/owner/repo</code></li>
+            <li><strong>Backend</strong> — On Vercel: set <code>GEMINI_API_KEY</code> in the backend project and redeploy</li>
+            <li><strong>Clone / network</strong> — If the error above mentions clone or network, the backend may not reach GitHub; try again or use a different repo</li>
+            <li><strong>Logs</strong> — In Vercel: Project → Deployments → select deployment → Functions → view logs for the failing request</li>
+          </ul>
+          {!results.error && (
+            <p className="muted" style={{ marginTop: '0.75rem' }}>
+              No error message was returned. Check backend function logs for the real cause.
+            </p>
+          )}
         </div>
       )}
 
