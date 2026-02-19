@@ -9,8 +9,35 @@ function formatTime(ms) {
   return m > 0 ? `${m}m ${secs}s` : `${secs}s`;
 }
 
+function formatTimelineEvent(t) {
+  const time = t.time != null ? `+${t.time}ms` : '';
+  switch (t.event) {
+    case 'START':
+      return { label: 'Run started', detail: null, kind: 'info', time };
+    case 'BRANCH_CREATED':
+      return { label: 'Branch created', detail: t.branch ? `Branch: ${t.branch}` : null, kind: 'info', time };
+    case 'TEST_START':
+      return { label: `Test run started`, detail: t.iteration ? `Iteration ${t.iteration}` : null, kind: 'info', time };
+    case 'TEST_RUN':
+      return {
+        label: t.passed ? 'Tests passed' : 'Tests failed',
+        detail: t.iteration ? `Iteration ${t.iteration}` : null,
+        kind: t.passed ? 'passed' : 'failed',
+        time,
+      };
+    case 'FIX_APPLIED':
+      return { label: 'Fix applied', detail: t.file || null, kind: 'fix', time };
+    case 'COMMIT':
+      return { label: 'Committed', detail: t.iteration ? `Iteration ${t.iteration}` : null, kind: 'info', time };
+    case 'DONE':
+      return { label: 'Run complete', detail: null, kind: 'info', time };
+    default:
+      return { label: t.event || '—', detail: null, kind: 'info', time };
+  }
+}
+
 export default function Dashboard() {
-  const { results, loading } = useAgent();
+  const { results, loading, running, loadResults } = useAgent();
 
   if (loading && !results) {
     return (
@@ -31,8 +58,6 @@ export default function Dashboard() {
     );
   }
 
-  const isEmpty = !results || (results.ci_status === '' && !results.repo);
-
   if (!results) {
     return (
       <section className="dashboard">
@@ -43,7 +68,15 @@ export default function Dashboard() {
     );
   }
 
-  if (isEmpty) {
+  const hasOutput =
+    results.repo ||
+    results.ci_status ||
+    results.error ||
+    (Array.isArray(results.fixes) && results.fixes.length > 0) ||
+    (Array.isArray(results.timeline) && results.timeline.length > 0) ||
+    (Array.isArray(results.run_log) && results.run_log.length > 0);
+
+  if (!hasOutput) {
     return (
       <section className="dashboard">
         <div className="card info-card">
@@ -60,14 +93,33 @@ export default function Dashboard() {
     );
   }
 
-  const statusPillClass = results.ci_status === 'PASSED' ? 'passed' : 'failed';
+  const statusPillClass = results.ci_status === 'PASSED' ? 'passed' : results.ci_status === 'FAILED' ? 'failed' : 'running';
   const sb = results.score_breakdown || {};
   const total = results.score ?? 0;
+  const timeline = Array.isArray(results.timeline) ? results.timeline : [];
 
   return (
     <section className="dashboard">
+      {results.error && (
+        <div className="card result-error-card">
+          <h3>Error</h3>
+          <p className="result-error-text">{results.error}</p>
+        </div>
+      )}
+
       <div className="card run-summary">
-        <h3>Run Summary</h3>
+        <div className="run-summary-head">
+          <h3>Run Summary</h3>
+          <button type="button" className="btn-refresh" onClick={() => loadResults(false)} disabled={loading}>
+            {loading ? '…' : 'Refresh results'}
+          </button>
+        </div>
+        {running && (
+          <p className="running-indicator">
+            <span className="btn-spinner" style={{ marginRight: 8 }} />
+            Run in progress…
+          </p>
+        )}
         <div className="summary-grid">
           <div className="summary-item">
             <span className="label">Repository</span>
@@ -105,7 +157,7 @@ export default function Dashboard() {
       </div>
 
       <div className="card score-breakdown">
-        <h3>Score Breakdown</h3>
+        <h3>Score</h3>
         <div className="score-total">{total}</div>
         <div className="score-bar">
           <div className="score-segment base" style={{ width: `${Math.min(100, (sb.base || 100) / 1.2)}%` }} title="Base: 100" />
@@ -159,39 +211,40 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {Array.isArray(results.run_log) && results.run_log.length > 0 && (
-        <div className="card run-log-card">
-          <h3>Run Log (checks & updates)</h3>
-          <pre className="run-log-pre">{results.run_log.map((l, i) => `+${l.t}ms ${l.msg} ${l.file || ''} ${l.line ? 'L' + l.line : ''} ${l.bugType || ''}`).join('\n')}</pre>
-        </div>
-      )}
       <div className="card timeline-card">
-        <h3>CI/CD Status Timeline</h3>
+        <h3>CI/CD Timeline</h3>
         <div className="timeline-header">
           <span>Iterations: {results.iterations_used ?? 0} / {results.retry_limit ?? 5}</span>
         </div>
-        {Array.isArray(results.timeline) && results.timeline.length > 0 ? (
+        {timeline.length > 0 ? (
           <div className="timeline-list">
-            {results.timeline
-              .filter(t => t.event === 'TEST_RUN')
-              .map((t, i) => (
-                <div key={i} className={`timeline-item ${t.passed ? 'passed' : 'failed'}`}>
-                  <span className="timeline-badge">{t.passed ? '✓' : '✗'}</span>
-                  <span className="timeline-iter">Iteration {t.iteration}</span>
-                  <span className="timeline-status">{t.passed ? 'PASSED' : 'FAILED'}</span>
-                  <span className="timeline-ts">+{t.time}ms</span>
+            {timeline.map((t, i) => {
+              const { label, detail, kind, time } = formatTimelineEvent(t);
+              return (
+                <div key={i} className={`timeline-item timeline-item-${kind}`}>
+                  <span className={`timeline-badge timeline-badge-${kind}`}>
+                    {kind === 'passed' ? '✓' : kind === 'failed' ? '✗' : '•'}
+                  </span>
+                  <span className="timeline-label">{label}</span>
+                  {detail && <span className="timeline-detail">{typeof detail === 'string' && detail.length > 60 ? <code title={detail}>{detail.slice(0, 60)}…</code> : <code>{detail}</code>}</span>}
+                  <span className="timeline-ts">{time}</span>
                 </div>
-              ))}
-            {results.timeline.filter(t => t.event === 'TEST_RUN').length === 0 && results.timeline.map((t, i) => (
-              <div key={i} className="timeline-item">
-                <span className="timeline-ts">+{t.time}ms</span>
-                <span className="timeline-event">{t.event}</span>
-                {t.branch && <code>{t.branch}</code>}
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <p className="muted">No timeline events</p>
+          <p className="muted">No timeline events yet</p>
+        )}
+      </div>
+
+      <div className="card run-log-card">
+        <h3>Run Log</h3>
+        {Array.isArray(results.run_log) && results.run_log.length > 0 ? (
+          <pre className="run-log-pre">
+            {results.run_log.map((l, i) => `+${l.t}ms ${l.msg}${l.file ? ' ' + l.file : ''}${l.line != null ? ' L' + l.line : ''}${l.bugType ? ' ' + l.bugType : ''}`).join('\n')}
+          </pre>
+        ) : (
+          <p className="muted">No run log yet</p>
         )}
       </div>
     </section>

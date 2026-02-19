@@ -27,6 +27,7 @@ const EMPTY_RESULTS = Object.freeze({
   fixes: [],
   timeline: [],
   run_log: [],
+  error: '',
 });
 
 function failurePayload(overrides = {}) {
@@ -46,6 +47,7 @@ function failurePayload(overrides = {}) {
     fixes: [],
     timeline: [],
     run_log: [],
+    error: '',
     ...overrides,
   };
 }

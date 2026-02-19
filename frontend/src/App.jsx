@@ -11,10 +11,6 @@ export default function App() {
     loadResults(false);
   }, [loadResults]);
 
-  useEffect(() => {
-    if (!running) loadResults(true);
-  }, [running, loadResults]);
-
   return (
     <div className="app">
       <LoadingOverlay visible={running} />

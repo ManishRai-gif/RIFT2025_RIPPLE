@@ -381,6 +381,37 @@ body::before {
   color: var(--error);
 }
 
+.run-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.run-summary-head h3 { margin: 0; }
+
+.btn-refresh {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-family: var(--font-sans);
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.25);
+}
+
+.btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -540,8 +571,17 @@ body::before {
   font-weight: 700;
 }
 
-.timeline-item.passed .timeline-badge { background: var(--success); color: white; }
-.timeline-item.failed .timeline-badge { background: var(--error); color: white; }
+.timeline-item.passed .timeline-badge,
+.timeline-badge.timeline-badge-passed { background: var(--success); color: white; }
+.timeline-item.failed .timeline-badge,
+.timeline-badge.timeline-badge-failed { background: var(--error); color: white; }
+.timeline-badge.timeline-badge-info,
+.timeline-badge.timeline-badge-fix { background: var(--border); color: var(--text-muted); }
+.timeline-badge.timeline-badge-fix { background: rgba(99, 102, 241, 0.3); color: var(--accent); }
+
+.timeline-label { font-weight: 500; flex: 1; }
+.timeline-detail { font-size: 0.85rem; color: var(--text-muted); }
+.timeline-detail code { font-size: 0.8rem; }
 
 .timeline-iter { font-weight: 500; }
 .timeline-status { font-size: 0.85rem; }
@@ -581,6 +621,34 @@ body::before {
 .status-pill.failed {
   background: rgba(239, 68, 68, 0.15);
   color: var(--error);
+}
+
+.status-pill.running,
+.status-badge.running {
+  background: rgba(99, 102, 241, 0.2);
+  color: var(--accent);
+}
+
+.result-error-card {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.result-error-text {
+  margin: 0;
+  color: var(--error);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.running-indicator {
+  display: flex;
+  align-items: center;
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+  color: var(--accent);
 }
 
 .status-pill::before {
