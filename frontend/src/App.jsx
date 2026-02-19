@@ -12,9 +12,7 @@ export default function App() {
   }, [loadResults]);
 
   useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => loadResults(true), 2500);
-    return () => clearInterval(id);
+    if (!running) loadResults(true);
   }, [running, loadResults]);
 
   return (

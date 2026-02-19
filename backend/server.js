@@ -11,7 +11,7 @@ const logger = require('./utils/logger');
 
 const app = express();
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: true }));
+app.use(cors({ origin: true, credentials: false, methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Accept'] }));
 app.use(express.json({ limit: '1mb' }));
 
 app.post('/api/run-agent', async (req, res) => {
@@ -83,12 +83,16 @@ app.post('/api/run-agent', async (req, res) => {
     logger.info('Run completed:', results.ci_status, 'score:', results.score);
   } catch (err) {
     logger.error('run-agent error:', err.message);
-    write(failurePayload({
-      repo: repoInput,
-      team_name: teamName || '',
-      team_leader: leaderName || '',
-      error: err.message,
-    }));
+    try {
+      write(failurePayload({
+        repo: repoInput,
+        team_name: teamName || '',
+        team_leader: leaderName || '',
+        error: err.message,
+      }));
+    } catch (writeErr) {
+      logger.error('run-agent: could not write failure payload', writeErr.message);
+    }
   } finally {
     if (tempDir) removeDir(tempDir);
   }

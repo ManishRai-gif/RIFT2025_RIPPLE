@@ -33,43 +33,37 @@ export function AgentProvider({ children }) {
   const triggerRun = useCallback(async (repo, teamName, leaderName) => {
     setRunning(true);
     setError(null);
-    console.warn('[Agent] Starting run:', { repo, teamName, leaderName });
     try {
-      const res = await runAgent({ repo, teamName, leaderName });
-      console.warn('[Agent] Run started, response:', res);
+      await runAgent({ repo, teamName, leaderName });
       const startTime = Date.now();
       const TIMEOUT_MS = 10 * 60 * 1000;
-      const POLL_MS = 2000;
-      let pollCount = 0;
+      const POLL_MS = 2500;
+      const MAX_POLL_FAILURES = 5;
+      let pollFailures = 0;
 
-      const poll = async () => {
-        pollCount++;
+      while (true) {
+        await new Promise((r) => setTimeout(r, POLL_MS));
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          setError('Run timed out (10 min). Check backend logs.');
+          break;
+        }
         try {
           const data = await fetchResults();
           const normalized = data && typeof data === 'object' ? { ...data } : {};
           setResults(normalized);
+          pollFailures = 0;
           const done = normalized.ci_status === 'PASSED' || normalized.ci_status === 'FAILED' || normalized.error;
-          if (normalized.run_log && normalized.run_log.length > 0) {
-            console.warn('[Agent] Run log:', normalized.run_log.map(l => `+${l.t}ms ${l.msg} ${l.file ? l.file : ''} ${l.line ? 'L' + l.line : ''} ${l.bugType ? l.bugType : ''}`).join('\n'));
-          }
-          if (done) {
-            console.warn('[Agent] Run complete:', normalized.ci_status, 'fixes:', normalized.fixes?.length, normalized);
-            return true;
-          }
-          console.warn('[Agent] Poll', pollCount, 'ci_status:', normalized.ci_status || 'pending', 'log entries:', normalized.run_log?.length || 0);
+          if (done) break;
         } catch (e) {
-          console.warn('[Agent] Poll error:', e);
+          pollFailures++;
+          if (pollFailures >= MAX_POLL_FAILURES) {
+            setError(`Backend unreachable after ${MAX_POLL_FAILURES} attempts. Check VITE_API_URL and backend.`);
+            break;
+          }
         }
-        return Date.now() - startTime > TIMEOUT_MS;
-      };
-
-      while (!(await poll())) {
-        await new Promise((r) => setTimeout(r, POLL_MS));
       }
     } catch (err) {
-      const msg = err.message || 'Failed to start agent';
-      setError(msg);
-      console.warn('[Agent] Run failed:', err);
+      setError(err.message || 'Failed to start agent');
     } finally {
       setRunning(false);
     }
