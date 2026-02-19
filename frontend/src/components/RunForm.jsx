@@ -18,12 +18,12 @@ export default function RunForm() {
       <h2>Run Agent</h2>
       <form onSubmit={handleSubmit}>
         <label>
-          Repository path
+          GitHub URL or local path
           <input
             type="text"
             value={repo}
             onChange={(e) => setRepo(e.target.value)}
-            placeholder="/path/to/local/repo"
+            placeholder="https://github.com/user/repo"
             disabled={running}
           />
         </label>

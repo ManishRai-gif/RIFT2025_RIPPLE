@@ -8,17 +8,18 @@ An autonomous DevOps agent that analyzes failing tests, proposes fixes using AI 
 
 **Ripple DevOps Agent** automates the process of fixing failing tests in a codebase:
 
-1. **Creates a branch** in format `TEAM_LEADER_AI_Fix`
-2. **Runs tests** inside a Docker container (safe, isolated)
-3. **If tests fail**, uses Gemini AI to:
+1. **Accepts a GitHub URL** (e.g. `https://github.com/user/repo`) or a local path – clones the repo if URL
+2. **Creates a branch** in format `TEAM_LEADER_AI_Fix`
+3. **Runs tests** inside a Docker container (safe, isolated)
+4. **If tests fail**, uses Gemini AI to:
    - Analyze the failure output
    - Identify the root cause and file to fix
    - Propose a code fix
    - Apply the fix and commit
-4. **Repeats** until tests pass or retry limit is reached
-5. **Generates a report** (score, fixes applied, timeline) shown in the dashboard
+5. **Repeats** until tests pass or retry limit is reached
+6. **Generates a report** (score, fixes applied, timeline) shown in the dashboard
 
-**Use case**: You have a Node.js project with failing `npm test`. Give the agent the repo path; it will iteratively fix bugs until tests pass or it gives up.
+**Use case**: You have a Node.js project on GitHub with failing `npm test`. Paste the GitHub URL (e.g. `https://github.com/owner/repo`); the agent clones it and iteratively fixes bugs until tests pass or it gives up.
 
 ---
 

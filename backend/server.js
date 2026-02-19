@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const config = require('./config');
 const { run } = require('./agents/orchestrator');
+const { cloneToTemp, isGitHubUrl, removeDir } = require('./utils/cloneRepo');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -11,25 +12,53 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 app.post('/api/run-agent', async (req, res) => {
+  let tempDir = null;
   try {
     const { repo, teamName, leaderName } = req.body || {};
-    const repoPath = typeof repo === 'string' ? path.resolve(repo.trim()) : null;
-    
-    if (!repoPath || !fs.existsSync(repoPath)) {
-      return res.status(400).json({ error: 'Valid local repository path required' });
+    const repoInput = typeof repo === 'string' ? repo.trim() : '';
+
+    if (!repoInput) {
+      return res.status(400).json({ error: 'Repository URL or path required' });
     }
 
-    const safeRepo = path.normalize(repoPath);
-    if (safeRepo.includes('..')) {
-      return res.status(400).json({ error: 'Invalid repository path' });
+    let repoPath = null;
+    let displayRepo = repoInput;
+
+    if (isGitHubUrl(repoInput)) {
+      res.status(202).json({ status: 'started', message: 'Cloning and running agent' });
+      const cloneResult = await cloneToTemp(repoInput);
+      if (!cloneResult.success) {
+        const results = { repo: repoInput, ci_status: 'FAILED', error: cloneResult.error };
+        fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify(results, null, 2), 'utf8');
+        return;
+      }
+      repoPath = cloneResult.path;
+      tempDir = repoPath;
+    } else {
+      repoPath = path.resolve(repoInput);
+      if (!fs.existsSync(repoPath)) {
+        return res.status(400).json({ error: 'Repository path does not exist' });
+      }
+      const normalized = path.normalize(repoPath);
+      if (normalized.includes('..')) {
+        return res.status(400).json({ error: 'Invalid repository path' });
+      }
+      res.status(202).json({ status: 'started', message: 'Agent run started' });
     }
 
-    res.status(202).json({ status: 'started', message: 'Agent run started' });
-
-    const results = await run(safeRepo, teamName || 'Team', leaderName || 'Leader');
+    const results = await run(repoPath, teamName || 'Team', leaderName || 'Leader', displayRepo);
     logger.info('Run completed:', results.ci_status, 'score:', results.score);
   } catch (err) {
     logger.error('run-agent error:', err.message);
+    try {
+      fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify({
+        repo: req.body?.repo || '',
+        ci_status: 'FAILED',
+        error: err.message,
+      }, null, 2), 'utf8');
+    } catch {}
+  } finally {
+    if (tempDir) removeDir(tempDir);
   }
 });
 
@@ -48,10 +77,10 @@ app.get('/api/results', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    ok: true, 
+  res.json({
+    ok: true,
     geminiConfigured: !!config.geminiApiKey,
-    retryLimit: config.retryLimit 
+    retryLimit: config.retryLimit,
   });
 });
 

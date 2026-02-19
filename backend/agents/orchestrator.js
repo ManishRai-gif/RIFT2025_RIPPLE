@@ -13,7 +13,7 @@ function extractFilePath(testOutput) {
   return m ? (m[1] || m[2] || '').split(':')[0] : '';
 }
 
-async function run(repoPath, teamName = 'Team', leaderName = 'Leader') {
+async function run(repoPath, teamName = 'Team', leaderName = 'Leader', displayRepo = null) {
   const startTime = Date.now();
   const timeline = [];
   const fixes = [];
@@ -113,14 +113,16 @@ async function run(repoPath, teamName = 'Team', leaderName = 'Leader') {
     const commits = await getCommitCount(repoPath);
     const score = computeScore(elapsed, commits);
 
-    const results = buildResults(repoPath, branch, totalFailures, totalFixes, ciStatus, iterations, config.retryLimit, score, fixes, timeline, startTime);
+    const repoDisplay = displayRepo || repoPath;
+    const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, ciStatus, iterations, config.retryLimit, score, fixes, timeline, startTime);
     const resultsPath = path.join(__dirname, '..', 'results.json');
     fs.writeFileSync(resultsPath, JSON.stringify(results, null, 2), 'utf8');
     addTimeline('DONE');
     return results;
   } catch (err) {
     logger.error('orchestrator error:', err.message);
-    const results = buildResults(repoPath, branch, totalFailures, totalFixes, 'FAILED', 0, config.retryLimit, 0, fixes, timeline, startTime);
+    const repoDisplay = displayRepo || repoPath;
+    const results = buildResults(repoDisplay, branch, totalFailures, totalFixes, 'FAILED', 0, config.retryLimit, 0, fixes, timeline, startTime);
     try {
       fs.writeFileSync(path.join(__dirname, '..', 'results.json'), JSON.stringify(results, null, 2), 'utf8');
     } catch {}
