@@ -28,7 +28,23 @@ app.post('/api/run-agent', async (req, res) => {
       res.status(202).json({ status: 'started', message: 'Cloning and running agent' });
       const cloneResult = await cloneToTemp(repoInput);
       if (!cloneResult.success) {
-        const results = { repo: repoInput, ci_status: 'FAILED', error: cloneResult.error };
+        const results = {
+          repo: repoInput,
+          team_name: teamName || '',
+          team_leader: leaderName || '',
+          branch: '',
+          ci_status: 'FAILED',
+          total_failures: 0,
+          total_fixes: 0,
+          iterations_used: 0,
+          retry_limit: config.retryLimit,
+          score: 0,
+          total_time_ms: 0,
+          score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
+          fixes: [],
+          timeline: [],
+          error: cloneResult.error,
+        };
         fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify(results, null, 2), 'utf8');
         return;
       }
@@ -53,7 +69,19 @@ app.post('/api/run-agent', async (req, res) => {
     try {
       fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify({
         repo: req.body?.repo || '',
+        team_name: req.body?.teamName || '',
+        team_leader: req.body?.leaderName || '',
+        branch: '',
         ci_status: 'FAILED',
+        total_failures: 0,
+        total_fixes: 0,
+        iterations_used: 0,
+        retry_limit: config.retryLimit,
+        score: 0,
+        total_time_ms: 0,
+        score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
+        fixes: [],
+        timeline: [],
         error: err.message,
       }, null, 2), 'utf8');
     } catch {}
@@ -64,6 +92,8 @@ app.post('/api/run-agent', async (req, res) => {
 
 const EMPTY_RESULTS = Object.freeze({
   repo: '',
+  team_name: '',
+  team_leader: '',
   branch: '',
   total_failures: 0,
   total_fixes: 0,
@@ -71,6 +101,8 @@ const EMPTY_RESULTS = Object.freeze({
   iterations_used: 0,
   retry_limit: 5,
   score: 0,
+  total_time_ms: 0,
+  score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
   fixes: [],
   timeline: [],
 });

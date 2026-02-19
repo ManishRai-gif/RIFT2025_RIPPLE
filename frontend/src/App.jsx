@@ -2,9 +2,10 @@ import React, { useEffect } from 'react';
 import { useAgent } from './context/AgentContext';
 import Dashboard from './components/Dashboard';
 import RunForm from './components/RunForm';
+import LoadingOverlay from './components/LoadingOverlay';
 
 export default function App() {
-  const { loadResults, error } = useAgent();
+  const { loadResults, error, running } = useAgent();
 
   useEffect(() => {
     loadResults();
@@ -14,6 +15,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <LoadingOverlay visible={running} />
       <header className="header">
         <h1>Ripple DevOps Agent</h1>
         <span className="tag">Autonomous CI Fix</span>

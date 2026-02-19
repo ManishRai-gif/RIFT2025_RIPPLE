@@ -35,7 +35,7 @@ async function commit(repoPath, message) {
     await git.add('.');
     const status = await git.status();
     if (status.files.length === 0) return { success: false, count: 0 };
-    await git.commit(message || 'AI fix');
+    await git.commit(message ? `[AI-AGENT] ${message}` : '[AI-AGENT] Fix');
     return { success: true, count: status.files.length };
   } catch (err) {
     logger.error('gitAgent commit error:', err.message);

@@ -4,8 +4,8 @@ import { useAgent } from '../context/AgentContext';
 export default function RunForm() {
   const { triggerRun, running } = useAgent();
   const [repo, setRepo] = useState('');
-  const [teamName, setTeamName] = useState('Team');
-  const [leaderName, setLeaderName] = useState('Leader');
+  const [teamName, setTeamName] = useState('RIFT ORGANISERS');
+  const [leaderName, setLeaderName] = useState('Saiyam Kumar');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -33,7 +33,7 @@ export default function RunForm() {
             type="text"
             value={teamName}
             onChange={(e) => setTeamName(e.target.value)}
-            placeholder="Team"
+            placeholder="RIFT ORGANISERS"
             disabled={running}
           />
         </label>
@@ -43,7 +43,7 @@ export default function RunForm() {
             type="text"
             value={leaderName}
             onChange={(e) => setLeaderName(e.target.value)}
-            placeholder="Leader"
+            placeholder="Saiyam Kumar"
             disabled={running}
           />
         </label>
