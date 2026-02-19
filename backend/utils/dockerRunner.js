@@ -40,6 +40,20 @@ async function runTestsInDocker(repoPath) {
   if (!fs.existsSync(safePath)) {
     throw new Error(`Repository path does not exist: ${safePath}`);
   }
+
+  // Vercel and other serverless platforms generally do not support Docker.
+  // Fail fast with a clear message so the orchestrator can still complete
+  // quickly and produce a score instead of hanging on docker.
+  if (process.env.VERCEL) {
+    const msg = 'Docker is not available in this environment (VERCEL); tests not executed.';
+    logger.warn('runTestsInDocker skipped:', msg);
+    return {
+      success: false,
+      stdout: msg,
+      exitCode: 1,
+    };
+  }
+
   const volumePath = safePath.startsWith('/') ? safePath : path.join(process.cwd(), safePath);
   const testCmd = buildTestCommand(safePath);
   const image = getDockerImage(safePath);

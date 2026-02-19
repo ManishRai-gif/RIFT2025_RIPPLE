@@ -33,7 +33,7 @@ export function AgentProvider({ children }) {
       const res = await runAgent({ repo, teamName, leaderName });
       console.warn('[Agent] Run started, response:', res);
       const startTime = Date.now();
-      const TIMEOUT_MS = 10 * 60 * 1000;
+      const TIMEOUT_MS = 3 * 60 * 1000;
       const POLL_MS = 2000;
       let pollCount = 0;
 
@@ -42,7 +42,14 @@ export function AgentProvider({ children }) {
         try {
           const data = await fetchResults();
           setResults(data);
-          const done = data.ci_status === 'PASSED' || data.ci_status === 'FAILED' || data.error;
+          const status = data.ci_status || '';
+          const done =
+            status === 'PASSED' ||
+            status === 'FAILED' ||
+            !!data.error ||
+            (typeof data.iterations_used === 'number' &&
+              typeof data.retry_limit === 'number' &&
+              data.iterations_used >= data.retry_limit);
           if (data.run_log && data.run_log.length > 0) {
             console.warn('[Agent] Run log:', data.run_log.map(l => `+${l.t}ms ${l.msg} ${l.file ? l.file : ''} ${l.line ? 'L' + l.line : ''} ${l.bugType ? l.bugType : ''}`).join('\n'));
           }
@@ -59,6 +66,9 @@ export function AgentProvider({ children }) {
 
       while (!(await poll())) {
         await new Promise((r) => setTimeout(r, POLL_MS));
+      }
+      if (Date.now() - startTime > TIMEOUT_MS) {
+        setError('Timed out waiting for agent results. Please check backend logs.');
       }
     } catch (err) {
       const msg = err.message || 'Failed to start agent';

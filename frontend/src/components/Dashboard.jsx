@@ -49,9 +49,13 @@ export default function Dashboard() {
         <div className="card info-card">
           <h3>What the agent checks</h3>
           <ul className="check-list">
-            <li>Node.js / Python projects with <code>npm test</code> or <code>pytest</code></li>
+            <li>Clones a GitHub repo (shallow clone) and creates a new fix branch</li>
+            <li>Runs tests in an isolated environment (Docker-based runner)</li>
+            <li>Analyzes failures and suggests fixes using Gemini (root cause, file, line, bug type)</li>
+            <li>Applies file-level fixes and commits changes</li>
+            <li>Re-runs tests iteratively up to a retry limit and records a timeline</li>
+            <li>Optionally pushes the fix branch back to GitHub (requires <code>GITHUB_TOKEN</code>)</li>
             <li>Bug types: LINTING, SYNTAX, LOGIC, TYPE_ERROR, IMPORT, INDENTATION</li>
-            <li>Test output and stack traces to find root cause</li>
           </ul>
           <p className="muted">Enter a GitHub URL, Team name, and Leader name. Click Run Agent. Results will appear here.</p>
         </div>

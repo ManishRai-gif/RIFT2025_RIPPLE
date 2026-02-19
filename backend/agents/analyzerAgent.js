@@ -42,7 +42,7 @@ Respond with valid JSON only, no markdown:
   "confidence": 0.9
 }`;
 
-    const text = await generateContent(prompt);
+    const text = await generateContent(prompt, { tag: 'analyzeBug' });
     const parsed = extractJson(text);
     if (!parsed || typeof parsed.rootCause !== 'string') {
       return { rootCause: 'Unknown', file: '', line: null, bugType: 'LOGIC', suggestion: 'Manual inspection needed', confidence: 0 };

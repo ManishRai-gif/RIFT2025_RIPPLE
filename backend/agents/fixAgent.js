@@ -37,7 +37,7 @@ Respond with valid JSON only:
 
 Return the ENTIRE fixed file content. Do not use placeholder comments.`;
 
-    const text = await generateContent(prompt);
+    const text = await generateContent(prompt, { tag: 'proposeFix' });
     const parsed = extractJson(text);
     if (!parsed || typeof parsed.content !== 'string') {
       return null;

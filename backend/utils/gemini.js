@@ -3,6 +3,17 @@ const logger = require('./logger');
 
 let genAI = null;
 
+function truncate(text, max = 1600) {
+  const s = String(text ?? '');
+  if (s.length <= max) return s;
+  return `${s.slice(0, max)}\n… [truncated ${s.length - max} chars]`;
+}
+
+function safeTag(tag) {
+  const t = String(tag || 'gemini').trim();
+  return t.length > 60 ? t.slice(0, 60) : t;
+}
+
 function getClient() {
   if (!config.geminiApiKey) return null;
   try {
@@ -25,8 +36,11 @@ async function generateContent(prompt, options = {}) {
   const timeout = options.timeout || config.geminiTimeout;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const tag = safeTag(options.tag);
+  const startedAt = Date.now();
   
   try {
+    logger.info(`[${tag}] prompt:\n${truncate(prompt, 2400)}`);
     const result = await Promise.race([
       client.generateContent(prompt),
       new Promise((_, reject) => 
@@ -37,9 +51,12 @@ async function generateContent(prompt, options = {}) {
     const response = result.response;
     const text = response?.text?.();
     if (!text) throw new Error('Empty Gemini response');
-    return text.trim();
+    const trimmed = text.trim();
+    logger.info(`[${tag}] response (${Date.now() - startedAt}ms):\n${truncate(trimmed, 2400)}`);
+    return trimmed;
   } catch (err) {
     clearTimeout(timeoutId);
+    logger.error(`[${tag}] error (${Date.now() - startedAt}ms):`, err.message);
     throw err;
   }
 }
