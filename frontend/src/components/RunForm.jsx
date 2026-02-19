@@ -7,6 +7,8 @@ export default function RunForm() {
   const [repo, setRepo] = useState('');
   const [teamName, setTeamName] = useState('RIFT ORGANISERS');
   const [leaderName, setLeaderName] = useState('Saiyam Kumar');
+  const base = getApiBase();
+  const isLocalDefault = base.startsWith('http://localhost') || base.startsWith('http://127.0.0.1');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -17,7 +19,12 @@ export default function RunForm() {
   return (
     <section className="card run-form">
       <h2>Run Agent</h2>
-      <p className="api-hint">API: {getApiBase()}</p>
+      <p className="api-hint">API: {base}</p>
+      {import.meta.env.PROD && isLocalDefault && (
+        <p className="muted" style={{ marginTop: 4, fontSize: '0.85rem' }}>
+          Set <code>VITE_API_URL</code> in Vercel (or build env) to your backend URL.
+        </p>
+      )}
       <form onSubmit={handleSubmit}>
         <label>
           GitHub URL or local path

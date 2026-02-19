@@ -1,49 +1,54 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const RETRY_DELAY = 2000;
-const MAX_RETRIES = 2;
 
-function log(msg, data) {
-  console.warn(`[Agent API] ${msg}`, data !== undefined ? data : '');
-}
-function logError(msg, err) {
-  console.warn(`[Agent API] ERROR ${msg}`, err);
+function parseErrorResponse(text, status) {
+  if (!text || status === 502 || status === 504) return text || `HTTP ${status}`;
+  try {
+    const j = JSON.parse(text);
+    if (j && typeof j.error === 'string') return j.error;
+  } catch (_) {}
+  return text.length > 200 ? text.slice(0, 200) + '…' : text;
 }
 
-async function fetchWithRetry(url, options = {}, retries = MAX_RETRIES) {
+async function request(url, options = {}) {
   const fullUrl = `${API_BASE}${url}`;
-  log('Request', { url: fullUrl, method: options.method || 'GET' });
-  let lastErr;
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const res = await fetch(fullUrl, {
-        ...options,
-        headers: { 'Content-Type': 'application/json', ...options.headers },
-      });
-      const text = await res.text();
-      log('Response', { status: res.status, url: fullUrl });
-      if (!res.ok) {
-        lastErr = new Error(text || `HTTP ${res.status}`);
-        logError('Request failed', lastErr.message);
-        throw lastErr;
-      }
-      const data = text ? JSON.parse(text) : {};
-      return data;
-    } catch (err) {
-      lastErr = err;
-      logError('Attempt failed', { attempt: i + 1, error: err.message });
-      if (i < retries) await new Promise((r) => setTimeout(r, RETRY_DELAY));
-    }
+  const method = options.method || 'GET';
+  const res = await fetch(fullUrl, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    const msg = parseErrorResponse(text, res.status);
+    throw new Error(msg);
   }
-  logError('All retries failed', lastErr?.message);
-  throw lastErr;
+  if (!text) return {};
+  try {
+    const data = JSON.parse(text);
+    return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  } catch (_) {
+    throw new Error('Invalid JSON from backend');
+  }
+}
+
+/** GET with one retry on network failure only. */
+export async function fetchWithRetry(url, options = {}) {
+  try {
+    return await request(url, options);
+  } catch (err) {
+    const isNetwork = err.name === 'TypeError' && (err.message || '').includes('fetch');
+    if (!isNetwork) throw err;
+    await new Promise((r) => setTimeout(r, 1500));
+    return request(url, options);
+  }
 }
 
 export async function fetchResults() {
   return fetchWithRetry('/api/results');
 }
 
+/** POST run-agent: no retries so we fail fast with backend error. */
 export async function runAgent(body) {
-  return fetchWithRetry('/api/run-agent', {
+  return request('/api/run-agent', {
     method: 'POST',
     body: JSON.stringify(body || {}),
   });
@@ -55,4 +60,9 @@ export async function fetchHealth() {
 
 export function getApiBase() {
   return API_BASE;
+}
+
+export function isApiBaseSet() {
+  const u = import.meta.env.VITE_API_URL;
+  return !!u && u.trim().length > 0;
 }

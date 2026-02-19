@@ -3,11 +3,13 @@ import re
 from typing import Dict, Any
 
 import flask
+from flask_cors import CORS
 import google.generativeai as genai
 import requests
 
 
 app = flask.Flask(__name__)
+CORS(app)
 
 
 def get_gemini_model():

@@ -11,20 +11,25 @@ function hasFile(repoPath, name) {
   return fs.existsSync(path.join(repoPath, name));
 }
 
-function buildTestCommand(repoPath) {
+function buildTestCommandInner(repoPath) {
   if (hasFile(repoPath, 'package.json')) {
-    return 'cd /repo && (npm ci 2>/dev/null || npm install --no-audit --no-fund) && (npm test 2>&1 || npx jest --passWithNoTests 2>&1 || echo "NO_TEST_SCRIPT")';
+    return '(npm ci 2>/dev/null || npm install --no-audit --no-fund) && (npm test 2>&1 || npx jest --passWithNoTests 2>&1 || echo "NO_TEST_SCRIPT")';
   }
   if (hasFile(repoPath, 'requirements.txt') || hasFile(repoPath, 'pyproject.toml') || hasFile(repoPath, 'setup.py')) {
-    return 'cd /repo && pip install -q -e . 2>/dev/null; pip install -q -r requirements.txt 2>/dev/null; pip install -q pytest 2>/dev/null; pytest -v 2>&1 || python -m pytest -v 2>&1 || echo "NO_TEST_SCRIPT"';
+    return 'pip install -q -e . 2>/dev/null; pip install -q -r requirements.txt 2>/dev/null; pip install -q pytest 2>/dev/null; pytest -v 2>&1 || python -m pytest -v 2>&1 || echo "NO_TEST_SCRIPT"';
   }
   if (hasFile(repoPath, 'go.mod')) {
-    return 'cd /repo && go test ./... 2>&1 || echo "NO_TEST_SCRIPT"';
+    return 'go test ./... 2>&1 || echo "NO_TEST_SCRIPT"';
   }
   if (hasFile(repoPath, 'Cargo.toml')) {
-    return 'cd /repo && cargo test 2>&1 || echo "NO_TEST_SCRIPT"';
+    return 'cargo test 2>&1 || echo "NO_TEST_SCRIPT"';
   }
-  return 'cd /repo && (npm test 2>&1 || pytest -v 2>&1 || echo "NO_TEST_SCRIPT")';
+  return '(npm test 2>&1 || pytest -v 2>&1 || echo "NO_TEST_SCRIPT")';
+}
+
+function buildTestCommand(repoPath, forDocker = true) {
+  const inner = buildTestCommandInner(repoPath);
+  return forDocker ? 'cd /repo && ' + inner : inner;
 }
 
 function getDockerImage(repoPath) {
@@ -55,7 +60,7 @@ async function runTestsInDocker(repoPath) {
   }
 
   const volumePath = safePath.startsWith('/') ? safePath : path.join(process.cwd(), safePath);
-  const testCmd = buildTestCommand(safePath);
+  const testCmd = buildTestCommand(safePath, true);
   const image = getDockerImage(safePath);
   const fullCmd = `docker run --rm -v "${volumePath}:/repo" -w /repo ${image} sh -c '${testCmd.replace(/'/g, "'\\''")}'`;
 
@@ -82,4 +87,38 @@ async function runTestsInDocker(repoPath) {
   }
 }
 
-module.exports = { runTestsInDocker };
+/** Run tests in-process (no Docker). Used on Vercel where Docker is unavailable. */
+async function runTestsLocal(repoPath) {
+  const safePath = path.resolve(repoPath);
+  if (!fs.existsSync(safePath)) {
+    throw new Error(`Repository path does not exist: ${safePath}`);
+  }
+  const testCmd = buildTestCommand(safePath, false);
+  const timeout = Math.min(config.dockerTimeout, 120000);
+  logger.info('Local test run (no Docker):', testCmd.slice(0, 100) + '...');
+  try {
+    const { stdout, stderr } = await Promise.race([
+      execAsync(testCmd, { cwd: safePath, maxBuffer: 1024 * 1024 * 4, timeout, shell: true }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Test run timeout')), timeout)),
+    ]);
+    return { success: true, stdout: (stdout || '') + (stderr || ''), exitCode: 0 };
+  } catch (err) {
+    const output = [err.stdout, err.stderr, err.message].filter(Boolean).join('\n');
+    logger.error('Local test run failed:', err.message);
+    return {
+      success: false,
+      stdout: String(output),
+      exitCode: err.code || 1,
+    };
+  }
+}
+
+/** Use Docker when available; on Vercel use local runner. */
+async function runTests(repoPath) {
+  if (process.env.VERCEL || (typeof __dirname === 'string' && __dirname.startsWith('/var/task'))) {
+    return runTestsLocal(repoPath);
+  }
+  return runTestsInDocker(repoPath);
+}
+
+module.exports = { runTestsInDocker, runTestsLocal, runTests };

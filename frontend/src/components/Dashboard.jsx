@@ -9,8 +9,35 @@ function formatTime(ms) {
   return m > 0 ? `${m}m ${secs}s` : `${secs}s`;
 }
 
+function formatTimelineEvent(t) {
+  const time = t.time != null ? `+${t.time}ms` : '';
+  switch (t.event) {
+    case 'START':
+      return { label: 'Run started', detail: null, kind: 'info', time };
+    case 'BRANCH_CREATED':
+      return { label: 'Branch created', detail: t.branch ? `Branch: ${t.branch}` : null, kind: 'info', time };
+    case 'TEST_START':
+      return { label: `Test run started`, detail: t.iteration ? `Iteration ${t.iteration}` : null, kind: 'info', time };
+    case 'TEST_RUN':
+      return {
+        label: t.passed ? 'Tests passed' : 'Tests failed',
+        detail: t.iteration ? `Iteration ${t.iteration}` : null,
+        kind: t.passed ? 'passed' : 'failed',
+        time,
+      };
+    case 'FIX_APPLIED':
+      return { label: 'Fix applied', detail: t.file || null, kind: 'fix', time };
+    case 'COMMIT':
+      return { label: 'Committed', detail: t.iteration ? `Iteration ${t.iteration}` : null, kind: 'info', time };
+    case 'DONE':
+      return { label: 'Run complete', detail: null, kind: 'info', time };
+    default:
+      return { label: t.event || '—', detail: null, kind: 'info', time };
+  }
+}
+
 export default function Dashboard() {
-  const { results, loading } = useAgent();
+  const { results, loading, running, loadResults } = useAgent();
 
   if (loading && !results) {
     return (
@@ -31,8 +58,6 @@ export default function Dashboard() {
     );
   }
 
-  const isEmpty = !results || (results.ci_status === '' && !results.repo);
-
   if (!results) {
     return (
       <section className="dashboard">
@@ -43,7 +68,15 @@ export default function Dashboard() {
     );
   }
 
-  if (isEmpty) {
+  const hasOutput =
+    results.repo ||
+    results.ci_status ||
+    results.error ||
+    (Array.isArray(results.fixes) && results.fixes.length > 0) ||
+    (Array.isArray(results.timeline) && results.timeline.length > 0) ||
+    (Array.isArray(results.run_log) && results.run_log.length > 0);
+
+  if (!hasOutput) {
     return (
       <section className="dashboard">
         <div className="card info-card">
@@ -58,19 +91,62 @@ export default function Dashboard() {
             <li>Bug types: LINTING, SYNTAX, LOGIC, TYPE_ERROR, IMPORT, INDENTATION</li>
           </ul>
           <p className="muted">Enter a GitHub URL, Team name, and Leader name. Click Run Agent. Results will appear here.</p>
+          <p className="muted" style={{ marginTop: '0.5rem' }}>A full run usually takes <strong>1–5 minutes</strong> (clone, tests, AI fixes, repeat).</p>
         </div>
       </section>
     );
   }
 
-  const statusPillClass = results.ci_status === 'PASSED' ? 'passed' : 'failed';
+  const statusPillClass = results.ci_status === 'PASSED' ? 'passed' : results.ci_status === 'FAILED' ? 'failed' : 'running';
   const sb = results.score_breakdown || {};
   const total = results.score ?? 0;
+  const timeline = Array.isArray(results.timeline) ? results.timeline : [];
+  const failedEarly =
+    results.ci_status === 'FAILED' &&
+    ((results.total_time_ms ?? 0) === 0 || timeline.length === 0);
 
   return (
     <section className="dashboard">
+      {results.error && (
+        <div className="card result-error-card">
+          <h3>Error</h3>
+          <p className="result-error-text">{results.error}</p>
+        </div>
+      )}
+
+      {failedEarly && (
+        <div className="card troubleshooting-card">
+          <h3>Run failed before completing any steps</h3>
+          <p className="troubleshooting-lead">
+            The agent did not reach tests or fixes. Use the steps below to fix it.
+          </p>
+          <ul className="troubleshooting-list">
+            <li><strong>Repo URL</strong> — Must be a public GitHub URL, e.g. <code>https://github.com/owner/repo</code></li>
+            <li><strong>Backend</strong> — On Vercel: set <code>GEMINI_API_KEY</code> in the backend project and redeploy</li>
+            <li><strong>Clone / network</strong> — If the error above mentions clone or network, the backend may not reach GitHub; try again or use a different repo</li>
+            <li><strong>Logs</strong> — In Vercel: Project → Deployments → select deployment → Functions → view logs for the failing request</li>
+          </ul>
+          {!results.error && (
+            <p className="muted" style={{ marginTop: '0.75rem' }}>
+              No error message was returned. Check backend function logs for the real cause.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="card run-summary">
-        <h3>Run Summary</h3>
+        <div className="run-summary-head">
+          <h3>Run Summary</h3>
+          <button type="button" className="btn-refresh" onClick={() => loadResults(false)} disabled={loading}>
+            {loading ? '…' : 'Refresh results'}
+          </button>
+        </div>
+        {running && (
+          <p className="running-indicator">
+            <span className="btn-spinner" style={{ marginRight: 8 }} />
+            Run in progress…
+          </p>
+        )}
         <div className="summary-grid">
           <div className="summary-item">
             <span className="label">Repository</span>
@@ -108,7 +184,7 @@ export default function Dashboard() {
       </div>
 
       <div className="card score-breakdown">
-        <h3>Score Breakdown</h3>
+        <h3>Score</h3>
         <div className="score-total">{total}</div>
         <div className="score-bar">
           <div className="score-segment base" style={{ width: `${Math.min(100, (sb.base || 100) / 1.2)}%` }} title="Base: 100" />
@@ -162,6 +238,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+<<<<<<< HEAD
       {Array.isArray(results.run_log) && results.run_log.length > 0 && (
         <div className="card run-log-card">
           <h3>Run Log (checks & updates)</h3>
@@ -179,33 +256,42 @@ export default function Dashboard() {
           </pre>
         </div>
       )}
+=======
+>>>>>>> fe9cbff9b1d1095fed42d46c9818a6bdfbdc1f11
       <div className="card timeline-card">
-        <h3>CI/CD Status Timeline</h3>
+        <h3>CI/CD Timeline</h3>
         <div className="timeline-header">
           <span>Iterations: {results.iterations_used ?? 0} / {results.retry_limit ?? 5}</span>
         </div>
-        {Array.isArray(results.timeline) && results.timeline.length > 0 ? (
+        {timeline.length > 0 ? (
           <div className="timeline-list">
-            {results.timeline
-              .filter(t => t.event === 'TEST_RUN')
-              .map((t, i) => (
-                <div key={i} className={`timeline-item ${t.passed ? 'passed' : 'failed'}`}>
-                  <span className="timeline-badge">{t.passed ? '✓' : '✗'}</span>
-                  <span className="timeline-iter">Iteration {t.iteration}</span>
-                  <span className="timeline-status">{t.passed ? 'PASSED' : 'FAILED'}</span>
-                  <span className="timeline-ts">+{t.time}ms</span>
+            {timeline.map((t, i) => {
+              const { label, detail, kind, time } = formatTimelineEvent(t);
+              return (
+                <div key={i} className={`timeline-item timeline-item-${kind}`}>
+                  <span className={`timeline-badge timeline-badge-${kind}`}>
+                    {kind === 'passed' ? '✓' : kind === 'failed' ? '✗' : '•'}
+                  </span>
+                  <span className="timeline-label">{label}</span>
+                  {detail && <span className="timeline-detail">{typeof detail === 'string' && detail.length > 60 ? <code title={detail}>{detail.slice(0, 60)}…</code> : <code>{detail}</code>}</span>}
+                  <span className="timeline-ts">{time}</span>
                 </div>
-              ))}
-            {results.timeline.filter(t => t.event === 'TEST_RUN').length === 0 && results.timeline.map((t, i) => (
-              <div key={i} className="timeline-item">
-                <span className="timeline-ts">+{t.time}ms</span>
-                <span className="timeline-event">{t.event}</span>
-                {t.branch && <code>{t.branch}</code>}
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <p className="muted">No timeline events</p>
+          <p className="muted">No timeline events yet</p>
+        )}
+      </div>
+
+      <div className="card run-log-card">
+        <h3>Run Log</h3>
+        {Array.isArray(results.run_log) && results.run_log.length > 0 ? (
+          <pre className="run-log-pre">
+            {results.run_log.map((l, i) => `+${l.t}ms ${l.msg}${l.file ? ' ' + l.file : ''}${l.line != null ? ' L' + l.line : ''}${l.bugType ? ' ' + l.bugType : ''}`).join('\n')}
+          </pre>
+        ) : (
+          <p className="muted">No run log yet</p>
         )}
       </div>
     </section>
