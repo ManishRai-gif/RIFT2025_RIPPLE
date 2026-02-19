@@ -2,8 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 
-const RESULTS_FILE = process.env.VERCEL
-  ? path.join('/tmp', 'ripple-agent-results.json')
+// Use writable /tmp on Vercel/serverless; /var/task is read-only
+const isServerless = process.env.VERCEL || (typeof __dirname === 'string' && __dirname.startsWith('/var/task'));
+const RESULTS_FILE = isServerless
+  ? '/tmp/ripple-agent-results.json'
   : path.join(__dirname, '..', 'results.json');
 
 const EMPTY_RESULTS = Object.freeze({
@@ -59,13 +61,14 @@ function read() {
 
 function write(data) {
   try {
-    if (!process.env.VERCEL) {
+    if (!isServerless) {
       const dir = path.dirname(RESULTS_FILE);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(RESULTS_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
     logger.error('resultsStore write error:', err.message);
+    throw err;
   }
 }
 
