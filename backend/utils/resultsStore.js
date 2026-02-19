@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 
-const RESULTS_FILE = path.join(__dirname, '..', 'results.json');
+const RESULTS_FILE = process.env.VERCEL
+  ? path.join('/tmp', 'ripple-agent-results.json')
+  : path.join(__dirname, '..', 'results.json');
 
 const EMPTY_RESULTS = Object.freeze({
   repo: '',
@@ -47,7 +49,8 @@ function read() {
   try {
     if (!fs.existsSync(RESULTS_FILE)) return { ...EMPTY_RESULTS };
     const data = fs.readFileSync(RESULTS_FILE, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    return { ...EMPTY_RESULTS, ...parsed };
   } catch (err) {
     logger.error('resultsStore read error:', err.message);
     return { ...EMPTY_RESULTS };
@@ -56,8 +59,10 @@ function read() {
 
 function write(data) {
   try {
-    const dir = path.dirname(RESULTS_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!process.env.VERCEL) {
+      const dir = path.dirname(RESULTS_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(RESULTS_FILE, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
     logger.error('resultsStore write error:', err.message);

@@ -30,7 +30,8 @@ async function fetchWithRetry(url, options = {}, retries = MAX_RETRIES) {
         logError('Request failed', lastErr.message);
         throw lastErr;
       }
-      const data = text ? JSON.parse(text) : {};
+      const raw = text ? JSON.parse(text) : {};
+      const data = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
       return data;
     } catch (err) {
       lastErr = err;

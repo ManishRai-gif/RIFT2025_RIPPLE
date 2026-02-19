@@ -16,22 +16,36 @@ app.use(express.json({ limit: '1mb' }));
 
 app.post('/api/run-agent', async (req, res) => {
   let tempDir = null;
-  logger.info('run-agent received:', JSON.stringify(req.body));
+  const body = req.body || {};
+  const { repo = '', teamName = '', leaderName = '' } = body;
+  logger.info('run-agent received:', JSON.stringify(body));
+
+  const repoInput = typeof repo === 'string' ? repo.trim() : '';
+  if (!repoInput) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Repository URL or path required',
+      received: { repo: body.repo, teamName: body.teamName, leaderName: body.leaderName },
+    });
+  }
+
+  const sendStarted = () => {
+    res.status(202).json({
+      ok: true,
+      status: 'started',
+      message: 'Agent run started',
+      repo: repoInput,
+      teamName: teamName || 'Team',
+      leaderName: leaderName || 'Leader',
+    });
+  };
+
   try {
-    const { repo, teamName, leaderName } = req.body || {};
-    const repoInput = typeof repo === 'string' ? repo.trim() : '';
-
-    if (!repoInput) {
-      logger.warn('run-agent: missing repo');
-      return res.status(400).json({ error: 'Repository URL or path required' });
-    }
-
     let repoPath = null;
-    let displayRepo = repoInput;
+    const displayRepo = repoInput;
 
     if (isGitHubUrl(repoInput)) {
-      logger.info('run-agent: cloning GitHub repo', repoInput);
-      res.status(202).json({ status: 'started', message: 'Cloning and running agent' });
+      sendStarted();
       const cloneResult = await cloneToTemp(repoInput);
       if (!cloneResult.success) {
         logger.error('run-agent: clone failed', cloneResult.error);
@@ -48,13 +62,17 @@ app.post('/api/run-agent', async (req, res) => {
     } else {
       repoPath = path.resolve(repoInput);
       if (!fs.existsSync(repoPath)) {
-        return res.status(400).json({ error: 'Repository path does not exist' });
+        return res.status(400).json({
+          ok: false,
+          error: 'Repository path does not exist',
+          path: repoInput,
+        });
       }
       const normalized = path.normalize(repoPath);
       if (normalized.includes('..')) {
-        return res.status(400).json({ error: 'Invalid repository path' });
+        return res.status(400).json({ ok: false, error: 'Invalid repository path' });
       }
-      res.status(202).json({ status: 'started', message: 'Agent run started' });
+      sendStarted();
     }
 
     logger.info('run-agent: starting orchestrator');
@@ -64,9 +82,9 @@ app.post('/api/run-agent', async (req, res) => {
   } catch (err) {
     logger.error('run-agent error:', err.message);
     write(failurePayload({
-      repo: req.body?.repo || '',
-      team_name: req.body?.teamName || '',
-      team_leader: req.body?.leaderName || '',
+      repo: repoInput,
+      team_name: teamName || '',
+      team_leader: leaderName || '',
       error: err.message,
     }));
   } finally {
@@ -77,15 +95,18 @@ app.post('/api/run-agent', async (req, res) => {
 app.get('/api/results', (req, res) => {
   try {
     const data = read();
-    res.json(data);
+    res.status(200).json({
+      ok: true,
+      ...data,
+    });
   } catch (err) {
     logger.error('results error:', err.message);
-    res.json(EMPTY_RESULTS);
+    res.status(200).json({ ok: true, ...EMPTY_RESULTS });
   }
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     ok: true,
     geminiConfigured: !!config.geminiApiKey,
     retryLimit: config.retryLimit,

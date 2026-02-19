@@ -16,7 +16,8 @@ export function AgentProvider({ children }) {
     }
     try {
       const data = await fetchResults();
-      setResults(data);
+      const normalized = data && typeof data === 'object' ? { ...data } : {};
+      setResults(normalized);
     } catch (err) {
       if (!isBackgroundRefresh) {
         const msg = `Cannot reach backend at ${getApiBase()}. Check VITE_API_URL.`;
@@ -45,16 +46,17 @@ export function AgentProvider({ children }) {
         pollCount++;
         try {
           const data = await fetchResults();
-          setResults(data);
-          const done = data.ci_status === 'PASSED' || data.ci_status === 'FAILED' || data.error;
-          if (data.run_log && data.run_log.length > 0) {
-            console.warn('[Agent] Run log:', data.run_log.map(l => `+${l.t}ms ${l.msg} ${l.file ? l.file : ''} ${l.line ? 'L' + l.line : ''} ${l.bugType ? l.bugType : ''}`).join('\n'));
+          const normalized = data && typeof data === 'object' ? { ...data } : {};
+          setResults(normalized);
+          const done = normalized.ci_status === 'PASSED' || normalized.ci_status === 'FAILED' || normalized.error;
+          if (normalized.run_log && normalized.run_log.length > 0) {
+            console.warn('[Agent] Run log:', normalized.run_log.map(l => `+${l.t}ms ${l.msg} ${l.file ? l.file : ''} ${l.line ? 'L' + l.line : ''} ${l.bugType ? l.bugType : ''}`).join('\n'));
           }
           if (done) {
-            console.warn('[Agent] Run complete:', data.ci_status, 'fixes:', data.fixes?.length, data);
+            console.warn('[Agent] Run complete:', normalized.ci_status, 'fixes:', normalized.fixes?.length, normalized);
             return true;
           }
-          console.warn('[Agent] Poll', pollCount, 'ci_status:', data.ci_status || 'pending', 'log entries:', data.run_log?.length || 0);
+          console.warn('[Agent] Poll', pollCount, 'ci_status:', normalized.ci_status || 'pending', 'log entries:', normalized.run_log?.length || 0);
         } catch (e) {
           console.warn('[Agent] Poll error:', e);
         }
