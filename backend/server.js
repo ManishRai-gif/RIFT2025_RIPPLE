@@ -32,7 +32,6 @@ app.post('/api/run-agent', async (req, res) => {
 
     if (isGitHubUrl(repoInput)) {
       logger.info('run-agent: cloning GitHub repo', repoInput);
-      res.status(202).json({ status: 'started', message: 'Cloning and running agent' });
       const cloneResult = await cloneToTemp(repoInput);
       if (!cloneResult.success) {
         logger.error('run-agent: clone failed', cloneResult.error);
@@ -51,10 +50,12 @@ app.post('/api/run-agent', async (req, res) => {
           score_breakdown: { base: 100, speed_bonus: 0, efficiency_penalty: 0 },
           fixes: [],
           timeline: [],
+          run_log: [],
           error: cloneResult.error,
         };
+        lastResults = results;
         fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify(results, null, 2), 'utf8');
-        return;
+        return res.status(400).json(results);
       }
       repoPath = cloneResult.path;
       tempDir = repoPath;
@@ -67,13 +68,13 @@ app.post('/api/run-agent', async (req, res) => {
       if (normalized.includes('..')) {
         return res.status(400).json({ error: 'Invalid repository path' });
       }
-      res.status(202).json({ status: 'started', message: 'Agent run started' });
     }
 
     logger.info('run-agent: starting orchestrator');
     const results = await run(repoPath, teamName || 'Team', leaderName || 'Leader', displayRepo);
     logger.info('Run completed:', results.ci_status, 'score:', results.score, 'wrote results.json');
     lastResults = results;
+    return res.status(200).json(results);
   } catch (err) {
     logger.error('run-agent error:', err.message);
     try {
@@ -97,7 +98,10 @@ app.post('/api/run-agent', async (req, res) => {
       };
       lastResults = errorResults;
       fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify(errorResults, null, 2), 'utf8');
-    } catch {}
+      return res.status(500).json(errorResults);
+    } catch {
+      return res.status(500).json({ error: err.message || 'run-agent failed' });
+    }
   } finally {
     if (tempDir) removeDir(tempDir);
   }
