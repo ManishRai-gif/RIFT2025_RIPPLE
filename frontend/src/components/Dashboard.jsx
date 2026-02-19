@@ -54,6 +54,7 @@ export default function Dashboard() {
             <li>Test output and stack traces to find root cause</li>
           </ul>
           <p className="muted">Enter a GitHub URL, Team name, and Leader name. Click Run Agent. Results will appear here.</p>
+          <p className="muted" style={{ marginTop: '0.5rem' }}>A full run usually takes <strong>1–5 minutes</strong> (clone, tests, AI fixes, repeat).</p>
         </div>
       </section>
     );

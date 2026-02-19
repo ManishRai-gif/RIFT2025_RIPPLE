@@ -80,23 +80,16 @@ Replace `your-backend-url.vercel.app` with your actual backend deployment URL (e
 
 ---
 
-## Important: Vercel Limitations for Backend
+## Vercel Backend: What Works
 
-The agent is designed to **run tests inside Docker** and can run for several minutes. Vercel serverless functions:
+The backend **can run on Vercel** with these behaviors:
 
-- **Timeout**: 10 seconds (Hobby) or 60 seconds (Pro)
-- **No Docker**: Cannot run `docker run` inside Vercel
-- **Stateless**: Long background jobs are stopped when the function returns
+- **Results storage**: Uses `/tmp` (writable); never writes under `/var/task`.
+- **Timeout**: `vercel.json` sets `maxDuration: 300` (5 minutes). Hobby/Pro plans support this.
+- **Tests**: On Vercel there is no Docker. The backend uses a **local test runner** (e.g. `npm test` in the cloned repo). **Node.js repos are fully supported.** Python/Go/Rust may fail on Vercel if those runtimes are not available in the function environment.
+- **Run time**: A full run (clone → tests → AI fixes → repeat) usually takes **1–5 minutes**. The frontend polls `GET /api/results` until `ci_status` is `PASSED` or `FAILED`.
 
-**Result**: `POST /api/run-agent` will **not** complete successfully on Vercel. The dashboard will work, but running the agent will fail.
-
-**For full agent functionality**, host the backend on a platform that supports Docker and long-running processes:
-
-- **Railway** – supports Docker and long-running Node apps
-- **Render** – supports Docker
-- **Fly.io** – supports Docker
-
-Use Vercel for the frontend and one of the above for the backend. Set `VITE_API_URL` to the Railway/Render/Fly backend URL.
+**For Docker isolation and all languages**, host the backend on Railway, Render, or Fly.io and set `VITE_API_URL` to that backend.
 
 ---
 

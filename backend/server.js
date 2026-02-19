@@ -37,6 +37,8 @@ app.post('/api/run-agent', async (req, res) => {
       repo: repoInput,
       teamName: teamName || 'Team',
       leaderName: leaderName || 'Leader',
+      estimated_seconds: 120,
+      note: 'Full output usually ready in 1–5 minutes. Poll GET /api/results.',
     });
   };
 

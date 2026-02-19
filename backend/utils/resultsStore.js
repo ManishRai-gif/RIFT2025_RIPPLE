@@ -2,11 +2,14 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 
-// Use writable /tmp on Vercel/serverless; /var/task is read-only
-const isServerless = process.env.VERCEL || (typeof __dirname === 'string' && __dirname.startsWith('/var/task'));
-const RESULTS_FILE = isServerless
-  ? '/tmp/ripple-agent-results.json'
-  : path.join(__dirname, '..', 'results.json');
+// Use writable /tmp on Vercel/serverless; /var/* is read-only there
+const defaultResultsPath = path.join(__dirname, '..', 'results.json');
+const isReadOnlyFs = !!(
+  process.env.VERCEL ||
+  (typeof defaultResultsPath === 'string' && defaultResultsPath.startsWith('/var/'))
+);
+const RESULTS_FILE = isReadOnlyFs ? '/tmp/ripple-agent-results.json' : defaultResultsPath;
+const isServerless = isReadOnlyFs;
 
 const EMPTY_RESULTS = Object.freeze({
   repo: '',
